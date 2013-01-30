@@ -915,6 +915,8 @@ static int nfs4_set_client(struct nfs_server *server,
 		const struct sockaddr *addr,
 		const size_t addrlen,
 		const char *ip_addr,
+		const struct sockaddr *srcaddr,
+		const size_t srcaddrlen,
 		int proto, const struct rpc_timeout *timeparms,
 		u32 minorversion, unsigned int nconnect,
 		unsigned int max_connect,
@@ -931,6 +933,8 @@ static int nfs4_set_client(struct nfs_server *server,
 		.net = net,
 		.timeparms = timeparms,
 		.cred = server->cred,
+		.srcaddr = srcaddr,
+		.srcaddrlen = srcaddrlen,
 	};
 	struct nfs_client *clp;
 
@@ -1174,6 +1178,8 @@ static int nfs4_init_server(struct nfs_server *server, struct fs_context *fc)
 				&ctx->nfs_server.address,
 				ctx->nfs_server.addrlen,
 				ctx->client_address,
+				&ctx->srcaddr.address,
+				ctx->srcaddr.addrlen,
 				ctx->nfs_server.protocol,
 				&timeparms,
 				ctx->minorversion,
@@ -1264,6 +1270,8 @@ struct nfs_server *nfs4_create_referral_server(struct fs_context *fc)
 				&ctx->nfs_server.address,
 				ctx->nfs_server.addrlen,
 				parent_client->cl_ipaddr,
+				(const struct sockaddr *)&parent_client->srcaddr,
+				parent_client->srcaddrlen,
 				XPRT_TRANSPORT_RDMA,
 				parent_server->client->cl_timeout,
 				parent_client->cl_mvops->minor_version,
@@ -1280,6 +1288,8 @@ struct nfs_server *nfs4_create_referral_server(struct fs_context *fc)
 				&ctx->nfs_server.address,
 				ctx->nfs_server.addrlen,
 				parent_client->cl_ipaddr,
+				(const struct sockaddr *)&parent_client->srcaddr,
+				parent_client->srcaddrlen,
 				XPRT_TRANSPORT_TCP,
 				parent_server->client->cl_timeout,
 				parent_client->cl_mvops->minor_version,
@@ -1342,6 +1352,7 @@ int nfs4_update_server(struct nfs_server *server, const char *hostname,
 	struct sockaddr *localaddr = (struct sockaddr *)&address;
 	int error;
 
+	/* TODO-BEN:  Not sure this is all just right when binding to source-addr. */
 	error = rpc_switch_client_transport(clnt, &xargs, clnt->cl_timeout);
 	if (error != 0)
 		return error;
@@ -1356,6 +1367,8 @@ int nfs4_update_server(struct nfs_server *server, const char *hostname,
 	nfs_server_remove_lists(server);
 	set_bit(NFS_MIG_TSM_POSSIBLE, &server->mig_status);
 	error = nfs4_set_client(server, hostname, sap, salen, buf,
+				(struct sockaddr *)(&clp->srcaddr),
+				clp->srcaddrlen,
 				clp->cl_proto, clnt->cl_timeout,
 				clp->cl_minorversion,
 				clp->cl_nconnect, clp->cl_max_connect, net);
