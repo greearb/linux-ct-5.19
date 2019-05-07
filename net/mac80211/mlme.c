@@ -2814,7 +2814,7 @@ static void __ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 		 * AP is probably out of range (or not reachable for another
 		 * reason) so remove the bss struct for that AP.
 		 */
-		cfg80211_unlink_bss(local->hw.wiphy, ifmgd->assoc_bss);
+		//cfg80211_unlink_bss(local->hw.wiphy, ifmgd->assoc_bss);
 	}
 
 	ieee80211_set_disassoc(sdata, IEEE80211_STYPE_DEAUTH,
@@ -4562,7 +4562,7 @@ static int ieee80211_auth(struct ieee80211_sub_if_data *sdata)
 		 * Most likely AP is not in the range so remove the
 		 * bss struct for that AP.
 		 */
-		cfg80211_unlink_bss(local->hw.wiphy, auth_data->bss);
+		//cfg80211_unlink_bss(local->hw.wiphy, auth_data->bss);
 
 		return -ETIMEDOUT;
 	}
@@ -4628,7 +4628,7 @@ static int ieee80211_do_assoc(struct ieee80211_sub_if_data *sdata)
 		 * Most likely AP is not in the range so remove the
 		 * bss struct for that AP.
 		 */
-		cfg80211_unlink_bss(local->hw.wiphy, assoc_data->bss);
+		//cfg80211_unlink_bss(local->hw.wiphy, assoc_data->bss);
 
 		return -ETIMEDOUT;
 	}
