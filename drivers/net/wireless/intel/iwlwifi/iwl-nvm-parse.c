@@ -768,16 +768,39 @@ iwl_nvm_fixup_sband_iftd(struct iwl_trans *trans,
 		if (!is_ap)
 			iftype_data->he_cap.he_cap_elem.phy_cap_info[7] |=
 				IEEE80211_HE_PHY_CAP7_MAX_NC_2;
-	} else if (!is_ap) {
-		/* If not 2x2, we need to indicate 1x1 in the
-		 * Midamble RX Max NSTS - but not for AP mode
+	} else {
+		if (!is_ap) {
+			/* If not 2x2, we need to indicate 1x1 in the
+			 * Midamble RX Max NSTS - but not for AP mode
+			 */
+			iftype_data->he_cap.he_cap_elem.phy_cap_info[1] &=
+				~IEEE80211_HE_PHY_CAP1_MIDAMBLE_RX_TX_MAX_NSTS;
+			iftype_data->he_cap.he_cap_elem.phy_cap_info[2] &=
+				~IEEE80211_HE_PHY_CAP2_MIDAMBLE_RX_TX_MAX_NSTS;
+			iftype_data->he_cap.he_cap_elem.phy_cap_info[7] |=
+				IEEE80211_HE_PHY_CAP7_MAX_NC_1;
+		}
+
+		/*
+		 * If antennas were forced - make sure not declaring MIMO when
+		 * we actually are SISO
+		 * Recall that there are 2 bits per stream in the "HE Tx/Rx HE
+		 * MCS NSS Support Field", so if some antenna is forced on but
+		 * not both A and B - we should work in SISO mode, so mark the
+		 * 2nd SS as not supported
 		 */
-		iftype_data->he_cap.he_cap_elem.phy_cap_info[1] &=
-			~IEEE80211_HE_PHY_CAP1_MIDAMBLE_RX_TX_MAX_NSTS;
-		iftype_data->he_cap.he_cap_elem.phy_cap_info[2] &=
-			~IEEE80211_HE_PHY_CAP2_MIDAMBLE_RX_TX_MAX_NSTS;
-		iftype_data->he_cap.he_cap_elem.phy_cap_info[7] |=
-			IEEE80211_HE_PHY_CAP7_MAX_NC_1;
+		iftype_data->he_cap.he_mcs_nss_supp.rx_mcs_80 |=
+			cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << 2);
+		iftype_data->he_cap.he_mcs_nss_supp.tx_mcs_80 |=
+			cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << 2);
+		iftype_data->he_cap.he_mcs_nss_supp.rx_mcs_160 |=
+			cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << 2);
+		iftype_data->he_cap.he_mcs_nss_supp.tx_mcs_160 |=
+			cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << 2);
+		iftype_data->he_cap.he_mcs_nss_supp.rx_mcs_80p80 |=
+			cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << 2);
+		iftype_data->he_cap.he_mcs_nss_supp.tx_mcs_80p80 |=
+			cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << 2);
 	}
 
 	switch (CSR_HW_RFID_TYPE(trans->hw_rf_id)) {
@@ -812,10 +835,6 @@ static void iwl_init_he_hw_capab(struct iwl_trans *trans,
 	struct ieee80211_sband_iftype_data *iftype_data;
 	int i;
 
-	/* should only initialize once */
-	if (WARN_ON(sband->iftype_data))
-		return;
-
 	BUILD_BUG_ON(sizeof(data->iftd.low) != sizeof(iwl_he_capa));
 	BUILD_BUG_ON(sizeof(data->iftd.high) != sizeof(iwl_he_capa));
 
@@ -843,6 +862,50 @@ static void iwl_init_he_hw_capab(struct iwl_trans *trans,
 
 	iwl_init_he_6ghz_capa(trans, data, sband, tx_chains, rx_chains);
 }
+
+/* This is a subsection of the logic in iwl_init_bands */
+void iwl_reinit_capab(struct iwl_trans *trans,
+		      struct iwl_nvm_data *data,
+		      u8 tx_chains, u8 rx_chains, const struct iwl_fw *fw) {
+	struct ieee80211_supported_band *sband;
+
+	sband = &data->bands[NL80211_BAND_2GHZ];
+	iwl_init_ht_hw_capab(trans, data, &sband->ht_cap, NL80211_BAND_2GHZ,
+			     tx_chains, rx_chains);
+
+	if (data->sku_cap_11ax_enable && !iwlwifi_mod_params.disable_11ax) {
+		iwl_init_he_hw_capab(trans, data, sband, tx_chains, rx_chains, fw);
+	}
+	else {
+		sband->iftype_data = NULL;
+	}
+
+	sband = &data->bands[NL80211_BAND_5GHZ];
+	iwl_init_ht_hw_capab(trans, data, &sband->ht_cap, NL80211_BAND_5GHZ,
+			     tx_chains, rx_chains);
+	if (data->sku_cap_11ac_enable && !iwlwifi_mod_params.disable_11ac)
+		iwl_init_vht_hw_capab(trans, data, &sband->vht_cap,
+				      tx_chains, rx_chains);
+	else
+		sband->vht_cap.vht_supported = false;
+
+	if (data->sku_cap_11ax_enable && !iwlwifi_mod_params.disable_11ax) {
+		iwl_init_he_hw_capab(trans, data, sband, tx_chains, rx_chains, fw);
+	}
+	else {
+		sband->iftype_data = NULL;
+	}
+
+	sband = &data->bands[NL80211_BAND_6GHZ];
+
+	if (data->sku_cap_11ax_enable && !iwlwifi_mod_params.disable_11ax) {
+		iwl_init_he_hw_capab(trans, data, sband, tx_chains, rx_chains, fw);
+	}
+	else {
+		sband->iftype_data = NULL;
+	}
+}
+IWL_EXPORT_SYMBOL(iwl_reinit_capab);
 
 static void iwl_init_sbands(struct iwl_trans *trans,
 			    struct iwl_nvm_data *data,
