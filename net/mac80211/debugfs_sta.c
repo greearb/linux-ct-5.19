@@ -189,6 +189,10 @@ static ssize_t sta_stats_read(struct file *file, char __user *userbuf,
 	PRINT_MY_STATS("rx-bw-160", rx_stats.msdu_160);
 
 	PRINT_MY_STATS("rx-he-total", rx_stats.msdu_he_tot);
+	PRINT_MY_STATS("rx-he-su", rx_stats.msdu_he_su);
+	PRINT_MY_STATS("rx-he-ext-su", rx_stats.msdu_he_ext_su);
+	PRINT_MY_STATS("rx-he-mu", rx_stats.msdu_he_mu);
+	PRINT_MY_STATS("rx-he-trigger", rx_stats.msdu_he_trigger);
 	PRINT_MY_STATS("rx-vht", rx_stats.msdu_vht);
 	PRINT_MY_STATS("rx-ht", rx_stats.msdu_ht);
 	PRINT_MY_STATS("rx-legacy", rx_stats.msdu_legacy);

@@ -764,8 +764,8 @@ ieee80211_make_monitor_skb(struct ieee80211_local *local,
  * radiotap header the driver might have added.
  */
 static struct sk_buff *
-ieee80211_rx_monitor(struct ieee80211_local *local, struct sk_buff *origskb,
-		     struct ieee80211_rate *rate)
+ieee80211_rx_monitor(struct ieee80211_radiotap_he *radiotap_he, struct ieee80211_local *local,
+		     struct sk_buff *origskb, struct ieee80211_rate *rate)
 {
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(origskb);
 	struct ieee80211_sub_if_data *sdata;
@@ -824,6 +824,19 @@ ieee80211_rx_monitor(struct ieee80211_local *local, struct sk_buff *origskb,
 		dev_kfree_skb(origskb);
 		return NULL;
 	}
+
+#ifdef CONFIG_MAC80211_DEBUG_STA_COUNTERS
+	if (status->flag & RX_FLAG_RADIOTAP_HE) {
+		/* Store this for later so we can gather stats.
+		 * This depends on drivers putting the radiotap_he header
+		 * on the skb first.  Seems all drivers do at this point.
+		 */
+		struct ieee80211_radiotap_he *he;
+		he = (struct ieee80211_radiotap_he *)(origskb->data + (rtap_space - sizeof(*he)));
+		*radiotap_he = *he;
+	}
+#endif
+
 
 	only_monitor = should_drop_frame(origskb, present_fcs_len, rtap_space);
 
@@ -1785,6 +1798,17 @@ static void ieee80211_update_data_rx_stats(struct ieee80211_rx_data *rx,
 
 	if (status->encoding == RX_ENC_HE) {
 		stats->msdu_he_tot++;
+		if (status->flag & RX_FLAG_RADIOTAP_HE) {
+			u8 he_type = rx->radiotap_he.data1 & 0x3;
+			if (he_type == 0x0)
+				stats->msdu_he_su++;
+			if (he_type == 0x1)
+				stats->msdu_he_ext_su++;
+			if (he_type == 0x2)
+				stats->msdu_he_mu++;
+			if (he_type == 0x3)
+				stats->msdu_he_trigger++;
+		}
 	}
 	else if (status->encoding == RX_ENC_VHT) {
 		stats->msdu_vht++;
@@ -4871,7 +4895,8 @@ drop:
 static void __ieee80211_rx_handle_packet(struct ieee80211_hw *hw,
 					 struct ieee80211_sta *pubsta,
 					 struct sk_buff *skb,
-					 struct list_head *list)
+					 struct list_head *list,
+					 struct ieee80211_radiotap_he *radiotap_he)
 {
 	struct ieee80211_local *local = hw_to_local(hw);
 	struct ieee80211_sub_if_data *sdata;
@@ -4887,6 +4912,9 @@ static void __ieee80211_rx_handle_packet(struct ieee80211_hw *hw,
 	rx.skb = skb;
 	rx.local = local;
 	rx.list = list;
+#ifdef CONFIG_MAC80211_DEBUG_STA_COUNTERS
+	rx.radiotap_he = *radiotap_he;
+#endif
 
 	if (ieee80211_is_data(fc) || ieee80211_is_mgmt(fc))
 		I802_DEBUG_INC(local->dot11ReceivedFragmentCount);
@@ -5019,6 +5047,7 @@ void ieee80211_rx_list(struct ieee80211_hw *hw, struct ieee80211_sta *pubsta,
 	struct ieee80211_supported_band *sband;
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	struct ieee80211_radiotap_he radiotap_he;
 
 	WARN_ON_ONCE(softirq_count() == 0);
 
@@ -5113,7 +5142,7 @@ void ieee80211_rx_list(struct ieee80211_hw *hw, struct ieee80211_sta *pubsta,
 	 * Also, frames with less than 16 bytes are dropped.
 	 */
 	if (!(status->flag & RX_FLAG_8023))
-		skb = ieee80211_rx_monitor(local, skb, rate);
+		skb = ieee80211_rx_monitor(&radiotap_he, local, skb, rate);
 	if (skb) {
 		if ((status->flag & RX_FLAG_8023) ||
 			ieee80211_is_data_present(hdr->frame_control))
@@ -5122,7 +5151,7 @@ void ieee80211_rx_list(struct ieee80211_hw *hw, struct ieee80211_sta *pubsta,
 		if (status->flag & RX_FLAG_8023)
 			__ieee80211_rx_handle_8023(hw, pubsta, skb, list);
 		else
-			__ieee80211_rx_handle_packet(hw, pubsta, skb, list);
+			__ieee80211_rx_handle_packet(hw, pubsta, skb, list, &radiotap_he);
 	}
 
 	kcov_remote_stop();

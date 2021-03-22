@@ -2732,6 +2732,10 @@ void sta_accum_rx_stats(struct sta_info *sta,
 		for (i = 0; i<NL80211_RATE_INFO_HE_RU_ALLOC_LAST; i++)
 			rx_stats->msdu_he_ru_alloc[i] += cpurxs->msdu_he_ru_alloc[i];
 		rx_stats->msdu_he_tot += cpurxs->msdu_he_tot;
+		rx_stats->msdu_he_su += cpurxs->msdu_he_su;
+		rx_stats->msdu_he_ext_su += cpurxs->msdu_he_ext_su;
+		rx_stats->msdu_he_mu += cpurxs->msdu_he_mu;
+		rx_stats->msdu_he_trigger += cpurxs->msdu_he_trigger;
 		rx_stats->msdu_vht += cpurxs->msdu_vht;
 		rx_stats->msdu_ht += cpurxs->msdu_ht;
 		rx_stats->msdu_legacy += cpurxs->msdu_legacy;

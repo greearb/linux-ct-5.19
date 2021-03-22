@@ -458,6 +458,10 @@ struct ieee80211_sta_rx_stats {
 	u32 msdu_160;
 	u32 msdu_he_ru_alloc[NL80211_RATE_INFO_HE_RU_ALLOC_LAST];
 	u32 msdu_he_tot;
+	u32 msdu_he_su;
+	u32 msdu_he_ext_su;
+	u32 msdu_he_mu;
+	u32 msdu_he_trigger;
 	u32 msdu_vht;
 	u32 msdu_ht;
 	u32 msdu_legacy;

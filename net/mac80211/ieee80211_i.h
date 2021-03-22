@@ -234,6 +234,11 @@ struct ieee80211_rx_data {
 			u8 pn[IEEE80211_CCMP_PN_LEN];
 		} ccm_gcm;
 	};
+
+#ifdef CONFIG_MAC80211_DEBUG_STA_COUNTERS
+	/* for stats gathering */
+	struct ieee80211_radiotap_he radiotap_he;
+#endif
 };
 
 struct ieee80211_csa_settings {
