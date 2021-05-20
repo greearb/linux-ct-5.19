@@ -4591,9 +4591,10 @@ static int nl80211_new_key(struct sk_buff *skb, struct genl_info *info)
 		err = rdev_add_key(rdev, dev, key.idx,
 				   key.type == NL80211_KEYTYPE_PAIRWISE,
 				   mac_addr, &key.p);
-		if (err)
+		if (err) {
 			GENL_SET_ERR_MSG(info, "key addition failed");
 			pr_info("%s: new-key:  rdev-add-key failed: %d\n", dev->name, err);
+		}
 	} else {
 		pr_info("%s: new-key:  key-allowed failed: %d\n", dev->name, err);
 	}
