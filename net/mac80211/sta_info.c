@@ -538,6 +538,7 @@ struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 			mandatory = IEEE80211_RATE_MANDATORY_A;
 			break;
 		case NL80211_BAND_60GHZ:
+			sta_dbg(sdata, "WARNING: 60ghz band selected.\n");
 			WARN_ON(1);
 			mandatory = 0;
 			break;
@@ -581,6 +582,8 @@ struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 			sta->known_smps_mode = IEEE80211_SMPS_DYNAMIC;
 			break;
 		default:
+			sta_dbg(sdata, "WARNING: un-handled smps: 0x%x  ht_cap.cap: 0x%x.\n",
+				smps, sband->ht_cap.cap);
 			WARN_ON(1);
 		}
 	}
