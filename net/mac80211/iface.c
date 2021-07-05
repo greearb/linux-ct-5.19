@@ -15,7 +15,10 @@
 #include <linux/if_arp.h>
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,13,0)
 #include <linux/kcov.h>
+#endif
 #include <net/mac80211.h>
 #include <net/ieee80211_radiotap.h>
 #include "ieee80211_i.h"
@@ -1630,7 +1633,9 @@ static void ieee80211_iface_work(struct work_struct *work)
 
 	/* first process frames */
 	while ((skb = skb_dequeue(&sdata->skb_queue))) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,13,0)
 		kcov_remote_start_common(skb_get_kcov_handle(skb));
+#endif
 
 		if (skb->protocol == cpu_to_be16(ETH_P_TDLS))
 			ieee80211_process_tdls_channel_switch(sdata, skb);
@@ -1640,7 +1645,9 @@ static void ieee80211_iface_work(struct work_struct *work)
 	done_skb_free:
 
 		kfree_skb(skb);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,13,0)
 		kcov_remote_stop();
+#endif
 	}
 
 	/* process status queue */
