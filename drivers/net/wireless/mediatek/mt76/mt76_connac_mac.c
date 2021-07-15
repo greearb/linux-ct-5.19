@@ -556,29 +556,35 @@ bool mt76_connac2_mac_add_txs_skb(struct mt76_dev *dev, struct mt76_wcid *wcid,
 {
 	struct ieee80211_supported_band *sband;
 	struct mt76_phy *mphy;
-	struct ieee80211_tx_info *info;
 	struct sk_buff_head list;
 	struct rate_info rate = {};
-	struct sk_buff *skb;
+	struct sk_buff *skb = NULL;
+	bool check_status;
 	bool cck = false;
 	u32 txrate, txs, mode;
 
-	mt76_tx_status_lock(dev, &list);
-	skb = mt76_tx_status_skb_get(dev, wcid, pid, &list);
-	if (!skb)
-		goto out;
+	check_status = (pid >= MT_PACKET_ID_FIRST);
+
+	if (check_status) {
+		mt76_tx_status_lock(dev, &list);
+		skb = mt76_tx_status_skb_get(dev, wcid, pid, &list);
+	}
 
 	txs = le32_to_cpu(txs_data[0]);
 
-	info = IEEE80211_SKB_CB(skb);
-	if (!(txs & MT_TXS0_ACK_ERROR_MASK))
-		info->flags |= IEEE80211_TX_STAT_ACK;
+	if (skb) {
+		struct ieee80211_tx_info *info;
 
-	info->status.ampdu_len = 1;
-	info->status.ampdu_ack_len = !!(info->flags &
-					IEEE80211_TX_STAT_ACK);
+		info = IEEE80211_SKB_CB(skb);
+		if (!(txs & MT_TXS0_ACK_ERROR_MASK))
+			info->flags |= IEEE80211_TX_STAT_ACK;
 
-	info->status.rates[0].idx = -1;
+		info->status.ampdu_len = 1;
+		info->status.ampdu_ack_len = !!(info->flags &
+						IEEE80211_TX_STAT_ACK);
+
+		info->status.rates[0].idx = -1;
+	}
 
 	txrate = FIELD_GET(MT_TXS0_TX_RATE, txs);
 
@@ -668,7 +674,8 @@ out:
 	if (skb)
 		mt76_tx_status_skb_done(dev, skb, &list);
 
-	mt76_tx_status_unlock(dev, &list);
+	if (check_status)
+		mt76_tx_status_unlock(dev, &list);
 
 	return !!skb;
 }
