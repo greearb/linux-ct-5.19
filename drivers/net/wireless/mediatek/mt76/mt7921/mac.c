@@ -245,6 +245,7 @@ mt7921_mac_fill_rx(struct mt7921_dev *dev, struct sk_buff *skb)
 	__le16 fc = 0;
 	u8 mode = 0;
 	int i, idx;
+	struct mt76_sta_stats *stats = NULL;
 
 	memset(status, 0, sizeof(*status));
 
@@ -272,6 +273,7 @@ mt7921_mac_fill_rx(struct mt7921_dev *dev, struct sk_buff *skb)
 
 	if (status->wcid) {
 		msta = container_of(status->wcid, struct mt7921_sta, wcid);
+		stats = &msta->stats;
 		spin_lock_bh(&dev->sta_poll_lock);
 		if (list_empty(&msta->poll_list))
 			list_add_tail(&msta->poll_list, &dev->sta_poll_list);
@@ -401,7 +403,7 @@ mt7921_mac_fill_rx(struct mt7921_dev *dev, struct sk_buff *skb)
 			status->enc_flags |= RX_ENC_FLAG_LDPC;
 
 		ret = mt76_connac2_mac_fill_rx_rate(&dev->mt76, status, sband,
-						    rxv, &mode, &nss);
+						    rxv, &mode, &nss, stats);
 		if (ret < 0)
 			return ret;
 
