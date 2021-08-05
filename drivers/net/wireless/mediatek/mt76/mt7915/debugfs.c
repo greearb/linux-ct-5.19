@@ -1174,7 +1174,8 @@ mt7915_rate_txpower_show(struct seq_file *file, void *data)
 	s8 txpower[MT7915_SKU_RATE_NUM], *buf;
 	int i;
 
-	seq_printf(file, "\nBand %d\n", phy != &phy->dev->phy);
+	seq_puts(file, "Per-chain txpower in 1/2 db units.\n");
+	seq_printf(file, "\nPhy %d\n", phy != &phy->dev->phy);
 	mt7915_mcu_get_txpower_sku(phy, txpower, sizeof(txpower));
 	for (i = 0, buf = txpower; i < ARRAY_SIZE(mt7915_sku_group_len); i++) {
 		u8 mcs_num = mt7915_sku_group_len[i];
