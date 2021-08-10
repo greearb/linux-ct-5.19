@@ -672,6 +672,27 @@ static void ieee80211_add_vht_ie(struct ieee80211_sub_if_data *sdata,
 	ieee80211_ie_build_vht_cap(pos, &vht_cap, cap);
 }
 
+void ieee80211_adjust_he_cap(struct ieee80211_sta_he_cap* my_cap,
+			     const struct ieee80211_sta_he_cap* he_cap,
+			     struct ieee80211_sub_if_data *sdata)
+{
+	memcpy(my_cap, he_cap, sizeof(*my_cap));
+
+	if (sdata->u.mgd.flags & IEEE80211_STA_DISABLE_160MHZ) {
+		my_cap->he_cap_elem.phy_cap_info[0] &=
+			~IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G;
+		my_cap->he_mcs_nss_supp.rx_mcs_160 = 0xffff;
+		my_cap->he_mcs_nss_supp.tx_mcs_160 = 0xffff;
+		pr_info("adjust-he-capp, disabling 160Mhz.");
+	}
+	if (sdata->u.mgd.flags & IEEE80211_STA_DISABLE_80P80MHZ) {
+		my_cap->he_cap_elem.phy_cap_info[0] &=
+			~IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G;
+		my_cap->he_mcs_nss_supp.rx_mcs_80p80 = 0xffff;
+		my_cap->he_mcs_nss_supp.tx_mcs_80p80 = 0xffff;
+	}
+}
+
 /* This function determines HE capability flags for the association
  * and builds the IE.
  */
@@ -681,6 +702,7 @@ static void ieee80211_add_he_ie(struct ieee80211_sub_if_data *sdata,
 {
 	u8 *pos, *pre_he_pos;
 	const struct ieee80211_sta_he_cap *he_cap = NULL;
+	struct ieee80211_sta_he_cap my_cap;
 	struct ieee80211_chanctx_conf *chanctx_conf;
 	u8 he_cap_size;
 	bool reg_cap = false;
@@ -700,11 +722,13 @@ static void ieee80211_add_he_ie(struct ieee80211_sub_if_data *sdata,
 		return;
 
 	/* get a max size estimate */
+	ieee80211_adjust_he_cap(&my_cap, he_cap, sdata);
+
 	he_cap_size =
-		2 + 1 + sizeof(he_cap->he_cap_elem) +
-		ieee80211_he_mcs_nss_size(&he_cap->he_cap_elem) +
-		ieee80211_he_ppe_size(he_cap->ppe_thres[0],
-				      he_cap->he_cap_elem.phy_cap_info);
+		2 + 1 + sizeof(my_cap.he_cap_elem) +
+		ieee80211_he_mcs_nss_size(&my_cap.he_cap_elem) +
+		ieee80211_he_ppe_size(my_cap.ppe_thres[0],
+				      my_cap.he_cap_elem.phy_cap_info);
 	pos = skb_put(skb, he_cap_size);
 	pre_he_pos = pos;
 	pos = ieee80211_ie_build_he_cap(sdata, sdata->u.mgd.flags,
@@ -5253,18 +5277,21 @@ ieee80211_verify_sta_he_mcs_support(struct ieee80211_sub_if_data *sdata,
 	const struct ieee80211_sta_he_cap *sta_he_cap =
 		ieee80211_get_he_iftype_cap(sband,
 					    ieee80211_vif_type_p2p(&sdata->vif));
+	struct ieee80211_sta_he_cap my_cap;
 	u16 ap_min_req_set;
 	int i;
 
 	if (!sta_he_cap || !he_op)
 		return false;
 
+	ieee80211_adjust_he_cap(&my_cap, sta_he_cap, sdata);
+
 	ap_min_req_set = le16_to_cpu(he_op->he_mcs_nss_set);
 
 	/* Need to go over for 80MHz, 160MHz and for 80+80 */
 	for (i = 0; i < 3; i++) {
 		const struct ieee80211_he_mcs_nss_supp *sta_mcs_nss_supp =
-			&sta_he_cap->he_mcs_nss_supp;
+			&my_cap.he_mcs_nss_supp;
 		u16 sta_mcs_map_rx =
 			le16_to_cpu(((__le16 *)sta_mcs_nss_supp)[2 * i]);
 		u16 sta_mcs_map_tx =

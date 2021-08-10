@@ -2158,7 +2158,11 @@ static int ieee80211_build_preq_ies_band(struct ieee80211_sub_if_data *sdata,
 	if (he_cap &&
 	    cfg80211_any_usable_channels(local->hw.wiphy, BIT(sband->band),
 					 IEEE80211_CHAN_NO_HE)) {
-		pos = ieee80211_ie_build_he_cap(sdata, 0, pos, he_cap, end);
+		struct ieee80211_sta_he_cap my_cap;
+
+		ieee80211_adjust_he_cap(&my_cap, he_cap, sdata);
+		pos = ieee80211_ie_build_he_cap(sdata, 0, pos, &my_cap, end);
+
 		if (!pos)
 			goto out_err;
 	}

@@ -2627,4 +2627,9 @@ ieee80211_eht_cap_ie_to_sta_eht_cap(struct ieee80211_sub_if_data *sdata,
 				    const u8 *he_cap_ie, u8 he_cap_len,
 				    const struct ieee80211_eht_cap_elem *eht_cap_ie_elem,
 				    u8 eht_cap_len, struct sta_info *sta);
+
+void ieee80211_adjust_he_cap(struct ieee80211_sta_he_cap* my_cap,
+			     const struct ieee80211_sta_he_cap* he_cap,
+			     struct ieee80211_sub_if_data *sdata);
+
 #endif /* IEEE80211_I_H */
