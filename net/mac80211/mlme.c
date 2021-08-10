@@ -471,11 +471,11 @@ static int ieee80211_config_bw(struct ieee80211_sub_if_data *sdata,
 
 	sdata_info(sdata,
 		   "AP %pM changed bandwidth, new config is %d.%03d MHz, "
-		   "width %d (%d.%03d/%d MHz)\n",
+		   "width %d (%d.%03d/%d MHz) ifmgd-flags: 0x%x\n",
 		   ifmgd->bssid, chandef.chan->center_freq,
 		   chandef.chan->freq_offset, chandef.width,
 		   chandef.center_freq1, chandef.freq1_offset,
-		   chandef.center_freq2);
+		   chandef.center_freq2, ifmgd->flags);
 
 	if (flags != (ifmgd->flags & (IEEE80211_STA_DISABLE_HT |
 				      IEEE80211_STA_DISABLE_VHT |
@@ -489,6 +489,15 @@ static int ieee80211_config_bw(struct ieee80211_sub_if_data *sdata,
 		sdata_info(sdata,
 			   "AP %pM changed caps/bw in a way we can't support (0x%x/0x%x) - disconnect\n",
 			   ifmgd->bssid, flags, ifmgd->flags);
+		sdata_info(sdata, "chandef-valid: %d bw: %d flgs-mask: 0x%x\n",
+			   cfg80211_chandef_valid(&chandef),
+			   chandef.width,
+			   (ifmgd->flags & (IEEE80211_STA_DISABLE_HT |
+					    IEEE80211_STA_DISABLE_VHT |
+					    IEEE80211_STA_DISABLE_HE |
+					    IEEE80211_STA_DISABLE_40MHZ |
+					    IEEE80211_STA_DISABLE_80P80MHZ |
+					    IEEE80211_STA_DISABLE_160MHZ)));
 		return -EINVAL;
 	}
 
@@ -6174,6 +6183,11 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 	if (req->flags & ASSOC_REQ_DISABLE_TWT)
 		ifmgd->flags |= IEEE80211_STA_DISABLE_TWT;
+
+	if (req->flags & ASSOC_REQ_DISABLE_160) {
+		ifmgd->flags |= IEEE80211_STA_DISABLE_160MHZ;
+		ifmgd->flags |= IEEE80211_STA_DISABLE_80P80MHZ;
+	}
 
 	err = ieee80211_prep_connection(sdata, req->bss, true, override);
 	if (err)
