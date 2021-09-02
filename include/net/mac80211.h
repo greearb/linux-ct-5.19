@@ -666,6 +666,7 @@ struct ieee80211_bss_conf {
 	/* association related data */
 	bool assoc, ibss_joined;
 	bool ibss_creator;
+	bool he_ofdma_disable; /* Ask driver to disable OFDMA */
 	u16 aid;
 	/* erp related data */
 	bool use_cts_prot;
@@ -2117,6 +2118,30 @@ struct ieee80211_link_sta {
 	struct ieee80211_sta_txpwr txpwr;
 };
 
+/* flags used in struct ieee80211_if_managed.flags
+ * In ieee80211_i.h in upstream code.
+ */
+enum ieee80211_sta_flags {
+	IEEE80211_STA_CONNECTION_POLL	= BIT(1),
+	IEEE80211_STA_CONTROL_PORT	= BIT(2),
+	IEEE80211_STA_DISABLE_HT	= BIT(4),
+	IEEE80211_STA_MFP_ENABLED	= BIT(6),
+	IEEE80211_STA_UAPSD_ENABLED	= BIT(7),
+	IEEE80211_STA_NULLFUNC_ACKED	= BIT(8),
+	IEEE80211_STA_RESET_SIGNAL_AVE	= BIT(9),
+	IEEE80211_STA_DISABLE_40MHZ	= BIT(10),
+	IEEE80211_STA_DISABLE_VHT	= BIT(11),
+	IEEE80211_STA_DISABLE_80P80MHZ	= BIT(12),
+	IEEE80211_STA_DISABLE_160MHZ	= BIT(13),
+	IEEE80211_STA_DISABLE_WMM	= BIT(14),
+	IEEE80211_STA_ENABLE_RRM	= BIT(15),
+	IEEE80211_STA_DISABLE_HE	= BIT(16),
+	IEEE80211_STA_DISABLE_EHT	= BIT(17),
+	IEEE80211_STA_DISABLE_320MHZ	= BIT(18),
+	IEEE80211_STA_DISABLE_TWT	= BIT(19),
+	IEEE80211_STA_DISABLE_OFDMA	= BIT(20),
+};
+
 /**
  * struct ieee80211_sta - station table entry
  *
@@ -2182,6 +2207,7 @@ struct ieee80211_sta {
 	bool tdls_initiator;
 	bool mfp;
 	u8 max_amsdu_subframes;
+	u32 mgd_flags; /* copy of sdata->u.mgd.flags to pass info to driver */
 
 	/**
 	 * @max_amsdu_len:

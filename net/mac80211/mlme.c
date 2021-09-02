@@ -683,13 +683,20 @@ void ieee80211_adjust_he_cap(struct ieee80211_sta_he_cap* my_cap,
 			~IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G;
 		my_cap->he_mcs_nss_supp.rx_mcs_160 = 0xffff;
 		my_cap->he_mcs_nss_supp.tx_mcs_160 = 0xffff;
-		pr_info("adjust-he-capp, disabling 160Mhz.");
+		pr_info("adjust-he-cap, disabling 160Mhz.");
 	}
 	if (sdata->u.mgd.flags & IEEE80211_STA_DISABLE_80P80MHZ) {
 		my_cap->he_cap_elem.phy_cap_info[0] &=
 			~IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G;
 		my_cap->he_mcs_nss_supp.rx_mcs_80p80 = 0xffff;
 		my_cap->he_mcs_nss_supp.tx_mcs_80p80 = 0xffff;
+	}
+	if (sdata->u.mgd.flags & IEEE80211_STA_DISABLE_OFDMA) {
+		pr_info("adjust-he-cap, disabling OFDMA.");
+		my_cap->he_cap_elem.mac_cap_info[3] &= ~IEEE80211_HE_MAC_CAP3_OFDMA_RA;
+		my_cap->he_cap_elem.mac_cap_info[5] &= ~IEEE80211_HE_MAC_CAP5_HT_VHT_TRIG_FRAME_RX;
+		my_cap->he_cap_elem.phy_cap_info[6] &= ~IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMING_FB;
+		my_cap->he_cap_elem.phy_cap_info[6] &= ~IEEE80211_HE_PHY_CAP6_TRIG_MU_BEAMFORMING_PARTIAL_BW_FB;
 	}
 }
 
@@ -1002,11 +1009,9 @@ skip_rates:
 
 	/* Apply overrides as needed. */
 	if (ifmgd->flags & IEEE80211_STA_DISABLE_TWT) {
-		if (ext_capa) {
-			if (ext_capa && ext_capa->datalen > 10) {
-				ext_capa->data[9] &= ~(WLAN_EXT_CAPA10_TWT_RESPONDER_SUPPORT);
-				ext_capa->data[9] &= ~(WLAN_EXT_CAPA10_TWT_REQUESTER_SUPPORT);
-			}
+		if (ext_capa && ext_capa->datalen > 10) {
+			ext_capa->data[9] &= ~(WLAN_EXT_CAPA10_TWT_RESPONDER_SUPPORT);
+			ext_capa->data[9] &= ~(WLAN_EXT_CAPA10_TWT_REQUESTER_SUPPORT);
 		}
 	}
 
@@ -6210,6 +6215,9 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 	if (req->flags & ASSOC_REQ_DISABLE_TWT)
 		ifmgd->flags |= IEEE80211_STA_DISABLE_TWT;
+
+	if (req->flags & ASSOC_REQ_DISABLE_OFDMA)
+		ifmgd->flags |= IEEE80211_STA_DISABLE_OFDMA;
 
 	if (req->flags & ASSOC_REQ_DISABLE_160) {
 		ifmgd->flags |= IEEE80211_STA_DISABLE_160MHZ;
