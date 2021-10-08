@@ -4198,12 +4198,12 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 				     struct ieee80211_hdr *hdr, size_t len,
 				     struct ieee80211_rx_status *rx_status)
 {
-	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
-	struct ieee80211_bss_conf *bss_conf = &sdata->vif.bss_conf;
+	struct ieee80211_if_managed *ifmgd;
+	struct ieee80211_bss_conf *bss_conf;
 	struct ieee80211_mgmt *mgmt = (void *) hdr;
 	size_t baselen;
 	struct ieee802_11_elems *elems;
-	struct ieee80211_local *local = sdata->local;
+	struct ieee80211_local *local;
 	struct ieee80211_chanctx_conf *chanctx_conf;
 	struct ieee80211_channel *chan;
 	struct sta_info *sta;
@@ -4213,6 +4213,12 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 	u32 ncrc = 0;
 	u8 *bssid, *variable = mgmt->u.beacon.variable;
 	u8 deauth_buf[IEEE80211_DEAUTH_FRAME_LEN];
+
+	BUG_ON(!sdata);
+
+	ifmgd = &sdata->u.mgd;
+	bss_conf = &sdata->vif.bss_conf;
+	local = sdata->local;
 
 	sdata_assert_lock(sdata);
 
