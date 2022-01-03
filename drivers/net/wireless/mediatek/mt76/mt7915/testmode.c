@@ -134,6 +134,21 @@ mt7915_tm_clean_hwq(struct mt7915_phy *phy, u8 wcid)
 }
 
 static int
+mt7915_tm_set_phy_count(struct mt7915_phy *phy, u8 control)
+{
+	struct mt7915_dev *dev = phy->dev;
+	struct mt7915_tm_cmd req = {
+		.testmode_en = 1,
+		.param_idx = MCU_ATE_SET_PHY_COUNT,
+		.param.cfg.enable = control,
+		.param.cfg.band = phy != &dev->phy,
+	};
+
+	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(ATE_CTRL), &req,
+				 sizeof(req), false);
+}
+
+static int
 mt7915_tm_set_slot_time(struct mt7915_phy *phy, u8 slot_time, u8 sifs)
 {
 	struct mt7915_dev *dev = phy->dev;
@@ -439,6 +454,8 @@ mt7915_tm_init(struct mt7915_phy *phy, bool en)
 	mt7915_mcu_add_bss_info(phy, phy->monitor_vif, en);
 	mt7915_mcu_add_sta(dev, phy->monitor_vif, NULL, en);
 
+	phy->mt76->test.flag |= MT_TM_FW_RX_COUNT;
+
 	if (!en)
 		mt7915_tm_set_tam_arb(phy, en, 0);
 }
@@ -508,18 +525,63 @@ mt7915_tm_set_tx_frames(struct mt7915_phy *phy, bool en)
 	mt7915_tm_set_trx(phy, TM_MAC_TX, en);
 }
 
+static int
+mt7915_tm_get_rx_stats(struct mt7915_phy *phy, bool clear)
+{
+#define CMD_RX_STAT_BAND	0x3
+	struct mt76_testmode_data *td = &phy->mt76->test;
+	struct mt7915_tm_rx_stat_band *rs_band;
+	struct mt7915_dev *dev = phy->dev;
+	struct sk_buff *skb;
+	struct {
+		u8 format_id;
+		u8 band;
+		u8 _rsv[2];
+	} __packed req = {
+		.format_id = CMD_RX_STAT_BAND,
+		.band = phy != &dev->phy,
+	};
+	int ret;
+
+	ret = mt76_mcu_send_and_get_msg(&dev->mt76, MCU_EXT_CMD(RX_STAT),
+					&req, sizeof(req), true, &skb);
+	if (ret)
+		return ret;
+
+	rs_band = (struct mt7915_tm_rx_stat_band *)skb->data;
+	/* pr_info("mdrdy_cnt = %d\n", le32_to_cpu(rs_band->mdrdy_cnt)); */
+	/* pr_info("fcs_err = %d\n", le16_to_cpu(rs_band->fcs_err)); */
+	/* pr_info("len_mismatch = %d\n", le16_to_cpu(rs_band->len_mismatch)); */
+	/* pr_info("fcs_ok = %d\n", le16_to_cpu(rs_band->fcs_succ)); */
+
+	if (!clear) {
+		enum mt76_rxq_id q = req.band ? MT_RXQ_BAND1 : MT_RXQ_MAIN;
+
+		td->rx_stats.packets[q] += le32_to_cpu(rs_band->mdrdy_cnt);
+		td->rx_stats.fcs_error[q] += le16_to_cpu(rs_band->fcs_err);
+		td->rx_stats.len_mismatch += le16_to_cpu(rs_band->len_mismatch);
+	}
+
+	dev_kfree_skb(skb);
+
+	return 0;
+}
+
 static void
 mt7915_tm_set_rx_frames(struct mt7915_phy *phy, bool en)
 {
 	mt7915_tm_set_trx(phy, TM_MAC_RX_RXV, false);
 
 	if (en) {
-		struct mt7915_dev *dev = phy->dev;
-
 		mt7915_tm_update_channel(phy);
 
 		/* read-clear */
-		mt76_rr(dev, MT_MIB_SDR3(phy != &dev->phy));
+		mt7915_tm_get_rx_stats(phy, true);
+
+		/* clear fw count */
+		mt7915_tm_set_phy_count(phy, 0);
+		mt7915_tm_set_phy_count(phy, 1);
+
 		mt7915_tm_set_trx(phy, TM_MAC_RX_RXV, en);
 	}
 }
@@ -746,12 +808,8 @@ static int
 mt7915_tm_dump_stats(struct mt76_phy *mphy, struct sk_buff *msg)
 {
 	struct mt7915_phy *phy = mphy->priv;
-	struct mt7915_dev *dev = phy->dev;
-	enum mt76_rxq_id q;
 	void *rx, *rssi;
-	u16 fcs_err;
 	int i;
-	u32 cnt;
 
 	rx = nla_nest_start(msg, MT76_TM_STATS_ATTR_LAST_RX);
 	if (!rx)
@@ -795,15 +853,7 @@ mt7915_tm_dump_stats(struct mt76_phy *mphy, struct sk_buff *msg)
 
 	nla_nest_end(msg, rx);
 
-	cnt = mt76_rr(dev, MT_MIB_SDR3(phy->band_idx));
-	fcs_err = is_mt7915(&dev->mt76) ? FIELD_GET(MT_MIB_SDR3_FCS_ERR_MASK, cnt) :
-		FIELD_GET(MT_MIB_SDR3_FCS_ERR_MASK_MT7916, cnt);
-
-	q = phy->band_idx ? MT_RXQ_BAND1 : MT_RXQ_MAIN;
-	mphy->test.rx_stats.packets[q] += fcs_err;
-	mphy->test.rx_stats.fcs_error[q] += fcs_err;
-
-	return 0;
+	return mt7915_tm_get_rx_stats(phy, false);
 }
 
 const struct mt76_testmode_ops mt7915_testmode_ops = {

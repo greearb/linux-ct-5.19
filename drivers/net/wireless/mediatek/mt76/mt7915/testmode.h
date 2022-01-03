@@ -33,6 +33,12 @@ struct mt7915_tm_clean_txq {
 	u8 rsv;
 };
 
+struct mt7915_tm_cfg {
+	u8 enable;
+	u8 band;
+	u8 _rsv[2];
+};
+
 struct mt7915_tm_cmd {
 	u8 testmode_en;
 	u8 param_idx;
@@ -43,6 +49,7 @@ struct mt7915_tm_cmd {
 		struct mt7915_tm_freq_offset freq;
 		struct mt7915_tm_slot_time slot;
 		struct mt7915_tm_clean_txq clean;
+		struct mt7915_tm_cfg cfg;
 		u8 test[72];
 	} param;
 } __packed;
@@ -100,6 +107,27 @@ enum {
 	TAM_ARB_OP_MODE_NORMAL = 1,
 	TAM_ARB_OP_MODE_TEST,
 	TAM_ARB_OP_MODE_FORCE_SU = 5,
+};
+
+struct mt7915_tm_rx_stat_band {
+	u8 category;
+
+	/* mac */
+	__le16 fcs_err;
+	__le16 len_mismatch;
+	__le16 fcs_succ;
+	__le32 mdrdy_cnt;
+	/* phy */
+	__le16 fcs_err_cck;
+	__le16 fcs_err_ofdm;
+	__le16 pd_cck;
+	__le16 pd_ofdm;
+	__le16 sig_err_cck;
+	__le16 sfd_err_cck;
+	__le16 sig_err_ofdm;
+	__le16 tag_err_ofdm;
+	__le16 mdrdy_cnt_cck;
+	__le16 mdrdy_cnt_ofdm;
 };
 
 #endif

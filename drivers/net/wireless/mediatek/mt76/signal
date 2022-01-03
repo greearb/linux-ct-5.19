@@ -1,0 +1,368 @@
+agg-rx.c:				  status->reorder_time +
+agg-rx.c:		mt76_rx_aggr_release_frames(tid, frames, status->seqno);
+agg-rx.c:	struct mt76_wcid *wcid = status->wcid;
+agg-rx.c:	u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
+agg-rx.c:	status->qos_ctl = tidno = le16_to_cpu(bar->control) >> 12;
+agg-rx.c:	struct mt76_wcid *wcid = status->wcid;
+agg-rx.c:	u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
+agg-rx.c:	if (!status->aggr && !(status->flag & RX_FLAG_8023)) {
+agg-rx.c:	ackp = status->qos_ctl & IEEE80211_QOS_CTL_ACK_POLICY_MASK;
+agg-rx.c:	status->flag |= RX_FLAG_DUP_VALIDATED;
+agg-rx.c:	seqno = status->seqno;
+agg-rx.c:	status->reorder_time = jiffies;
+mac80211.c:		if (!(status->flag & RX_FLAG_8023)) {
+mac80211.c:			if ((status->flag &
+mac80211.c:	    (!status->amsdu || status->first_amsdu ||
+mac80211.c:	     status->seqno != phy->rx_amsdu[q].seqno))
+mac80211.c:		phy->rx_amsdu[q].seqno = status->seqno;
+mac80211.c:	if (!status->amsdu || status->last_amsdu)
+mac80211.c:	struct mt76_phy *phy = mt76_dev_phy(dev, status->ext_phy);
+mac80211.c:		if (status->flag & RX_FLAG_FAILED_FCS_CRC)
+mac80211.c:	s8 *chain_signal = status->chain_signal;
+mac80211.c:	for (chains = status->chains; chains; chains >>= 1, chain_signal++) {
+mac80211.c:	status->flag = mstat.flag;
+mac80211.c:	status->freq = mstat.freq;
+mac80211.c:	status->enc_flags = mstat.enc_flags;
+mac80211.c:	status->encoding = mstat.encoding;
+mac80211.c:	status->bw = mstat.bw;
+mac80211.c:	status->he_ru = mstat.he_ru;
+mac80211.c:	status->he_gi = mstat.he_gi;
+mac80211.c:	status->he_dcm = mstat.he_dcm;
+mac80211.c:	status->rate_idx = mstat.rate_idx;
+mac80211.c:	status->nss = mstat.nss;
+mac80211.c:	status->band = mstat.band;
+mac80211.c:	status->signal = mstat.signal;
+mac80211.c:	status->chains = mstat.chains;
+mac80211.c:	status->ampdu_reference = mstat.ampdu_ref;
+mac80211.c:	status->device_timestamp = mstat.timestamp;
+mac80211.c:	status->mactime = mstat.timestamp;
+mac80211.c:	status->signal = mt76_rx_signal(&mstat);
+mac80211.c:	if (status->signal <= -128)
+mac80211.c:		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
+mac80211.c:		status->boottime_ns = ktime_get_boottime_ns();
+mac80211.c:	BUILD_BUG_ON(sizeof(status->chain_signal) !=
+mac80211.c:	memcpy(status->chain_signal, mstat.chain_signal,
+mac80211.c:	struct mt76_wcid *wcid = status->wcid;
+mac80211.c:	if (!(status->flag & RX_FLAG_DECRYPTED))
+mac80211.c:	security_idx = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
+mac80211.c:	if (status->flag & RX_FLAG_8023)
+mac80211.c:	if (!(status->flag & RX_FLAG_IV_STRIPPED)) {
+mac80211.c:	BUILD_BUG_ON(sizeof(status->iv) != sizeof(wcid->rx_key_pn[0]));
+mac80211.c:	ret = memcmp(status->iv, wcid->rx_key_pn[security_idx],
+mac80211.c:		     sizeof(status->iv));
+mac80211.c:	memcpy(wcid->rx_key_pn[security_idx], status->iv, sizeof(status->iv));
+mac80211.c:	if (status->flag & RX_FLAG_IV_STRIPPED)
+mac80211.c:		status->flag |= RX_FLAG_PN_VALIDATED;
+mac80211.c:	struct mt76_wcid *wcid = status->wcid;
+mac80211.c:		.enc_flags = status->enc_flags,
+mac80211.c:		.rate_idx = status->rate_idx,
+mac80211.c:		.encoding = status->encoding,
+mac80211.c:		.band = status->band,
+mac80211.c:		.nss = status->nss,
+mac80211.c:		.bw = status->bw,
+mac80211.c:	u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
+mac80211.c:	struct mt76_wcid *wcid = status->wcid;
+mac80211.c:		if (status->flag & RX_FLAG_8023)
+mac80211.c:	if (!(status->flag & RX_FLAG_AMPDU_DETAILS) ||
+mac80211.c:	    status->ampdu_ref != dev->rx_ampdu_ref)
+mac80211.c:	if (status->flag & RX_FLAG_AMPDU_DETAILS) {
+mac80211.c:		    status->ampdu_ref != dev->rx_ampdu_ref) {
+mac80211.c:			dev->rx_ampdu_ref = status->ampdu_ref;
+mac80211.c:	struct mt76_wcid *wcid = status->wcid;
+mac80211.c:	u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
+mac80211.c:	hw = mt76_phy_hw(dev, status->ext_phy);
+mac80211.c:	    !(status->flag & RX_FLAG_8023)) {
+mac80211.c:			wcid = status->wcid = (struct mt76_wcid *)sta->drv_priv;
+mac80211.c:	if (status->signal <= 0)
+mac80211.c:		ewma_signal_add(&wcid->rssi, -status->signal);
+mac80211.c:	if (status->flag & RX_FLAG_8023)
+mac80211.c:	u8 *hdr, *pn = status->iv;
+mac80211.c:	status->flag &= ~RX_FLAG_IV_STRIPPED;
+mt7603/mac.c:	status->wcid = mt7603_rx_get_wcid(dev, idx, unicast);
+mt7603/mac.c:	status->band = sband->band;
+mt7603/mac.c:		status->freq = sband->channels[i].center_freq;
+mt7603/mac.c:		status->flag |= RX_FLAG_FAILED_FCS_CRC;
+mt7603/mac.c:		status->flag |= RX_FLAG_MMIC_ERROR;
+mt7603/mac.c:		status->flag |= RX_FLAG_ONLY_MONITOR;
+mt7603/mac.c:		status->flag |= RX_FLAG_DECRYPTED;
+mt7603/mac.c:		status->flag |= RX_FLAG_IV_STRIPPED;
+mt7603/mac.c:		status->flag |= RX_FLAG_MMIC_STRIPPED | RX_FLAG_MIC_STRIPPED;
+mt7603/mac.c:		if (status->flag & RX_FLAG_DECRYPTED) {
+mt7603/mac.c:				status->iv[0] = data[5];
+mt7603/mac.c:				status->iv[1] = data[4];
+mt7603/mac.c:				status->iv[2] = data[3];
+mt7603/mac.c:				status->iv[3] = data[2];
+mt7603/mac.c:				status->iv[4] = data[1];
+mt7603/mac.c:				status->iv[5] = data[0];
+mt7603/mac.c:		status->timestamp = le32_to_cpu(rxd[0]);
+mt7603/mac.c:		status->flag |= RX_FLAG_MACTIME_START;
+mt7603/mac.c:			status->flag |= RX_FLAG_AMPDU_DETAILS;
+mt7603/mac.c:			if (dev->rx_ampdu_ts != status->timestamp) {
+mt7603/mac.c:			dev->rx_ampdu_ts = status->timestamp;
+mt7603/mac.c:			status->ampdu_ref = dev->ampdu_ref;
+mt7603/mac.c:			status->encoding = RX_ENC_HT;
+mt7603/mac.c:			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+mt7603/mac.c:			status->enc_flags |= RX_ENC_FLAG_LDPC;
+mt7603/mac.c:		status->enc_flags |= RX_ENC_FLAG_STBC_MASK *
+mt7603/mac.c:		status->rate_idx = i;
+mt7603/mac.c:		status->chains = dev->mphy.antenna_mask;
+mt7603/mac.c:		status->chain_signal[0] = FIELD_GET(MT_RXV4_IB_RSSI0, rxdg3) +
+mt7603/mac.c:		status->chain_signal[1] = FIELD_GET(MT_RXV4_IB_RSSI1, rxdg3) +
+mt7603/mac.c:			status->bw = RATE_INFO_BW_40;
+mt7603/mac.c:	if (!status->wcid || !ieee80211_is_data_qos(hdr->frame_control))
+mt7603/mac.c:	status->aggr = unicast &&
+mt7603/mac.c:	status->qos_ctl = *ieee80211_get_qos_ctl(hdr);
+mt7603/mac.c:	status->seqno = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
+mt7615/mac.c:		status->freq = mphy->chandef.chan->center_freq;
+mt7615/mac.c:		status->band = mphy->chandef.chan->band;
+mt7615/mac.c:	status->band = chfreq <= 14 ? NL80211_BAND_2GHZ : NL80211_BAND_5GHZ;
+mt7615/mac.c:	status->freq = ieee80211_channel_to_frequency(chfreq, status->band);
+mt7615/mac.c:	struct mt7615_sta *msta = (struct mt7615_sta *)status->wcid;
+mt7615/mac.c:	status->flag &= ~(RX_FLAG_RADIOTAP_HE | RX_FLAG_RADIOTAP_HE_MU);
+mt7615/mac.c:		status->flag |= RX_FLAG_ONLY_MONITOR;
+mt7615/mac.c:	status->wcid = mt7615_rx_get_wcid(dev, idx, unicast);
+mt7615/mac.c:	if (status->wcid) {
+mt7615/mac.c:		msta = container_of(status->wcid, struct mt7615_sta, wcid);
+mt7615/mac.c:		status->flag |= RX_FLAG_FAILED_FCS_CRC;
+mt7615/mac.c:		status->flag |= RX_FLAG_MMIC_ERROR;
+mt7615/mac.c:		status->flag |= RX_FLAG_DECRYPTED;
+mt7615/mac.c:		status->flag |= RX_FLAG_IV_STRIPPED;
+mt7615/mac.c:		status->flag |= RX_FLAG_MMIC_STRIPPED | RX_FLAG_MIC_STRIPPED;
+mt7615/mac.c:		if (status->flag & RX_FLAG_DECRYPTED) {
+mt7615/mac.c:				status->iv[0] = data[5];
+mt7615/mac.c:				status->iv[1] = data[4];
+mt7615/mac.c:				status->iv[2] = data[3];
+mt7615/mac.c:				status->iv[3] = data[2];
+mt7615/mac.c:				status->iv[4] = data[1];
+mt7615/mac.c:				status->iv[5] = data[0];
+mt7615/mac.c:		status->timestamp = le32_to_cpu(rxd[0]);
+mt7615/mac.c:		status->flag |= RX_FLAG_MACTIME_START;
+mt7615/mac.c:			status->flag |= RX_FLAG_AMPDU_DETAILS;
+mt7615/mac.c:			if (phy->rx_ampdu_ts != status->timestamp) {
+mt7615/mac.c:			phy->rx_ampdu_ts = status->timestamp;
+mt7615/mac.c:			status->ampdu_ref = phy->ampdu_ref;
+mt7615/mac.c:		status->ext_phy = true;
+mt7615/mac.c:	if (status->band == NL80211_BAND_5GHZ)
+mt7615/mac.c:			status->encoding = RX_ENC_HT;
+mt7615/mac.c:			status->nss = FIELD_GET(MT_RXV2_NSTS, rxdg1) + 1;
+mt7615/mac.c:			status->encoding = RX_ENC_VHT;
+mt7615/mac.c:		status->rate_idx = i;
+mt7615/mac.c:			status->bw = RATE_INFO_BW_40;
+mt7615/mac.c:			status->bw = RATE_INFO_BW_80;
+mt7615/mac.c:			status->bw = RATE_INFO_BW_160;
+mt7615/mac.c:			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+mt7615/mac.c:			status->enc_flags |= RX_ENC_FLAG_LDPC;
+mt7615/mac.c:		status->enc_flags |= RX_ENC_FLAG_STBC_MASK * stbc;
+mt7615/mac.c:		status->chains = mphy->antenna_mask;
+mt7615/mac.c:		status->chain_signal[0] = to_rssi(MT_RXV4_RCPI0, rxdg3);
+mt7615/mac.c:		status->chain_signal[1] = to_rssi(MT_RXV4_RCPI1, rxdg3);
+mt7615/mac.c:		status->chain_signal[2] = to_rssi(MT_RXV4_RCPI2, rxdg3);
+mt7615/mac.c:		status->chain_signal[3] = to_rssi(MT_RXV4_RCPI3, rxdg3);
+mt7615/mac.c:	status->amsdu = !!amsdu_info;
+mt7615/mac.c:	if (status->amsdu) {
+mt7615/mac.c:		status->first_amsdu = amsdu_info == MT_RXD1_FIRST_AMSDU_FRAME;
+mt7615/mac.c:		status->last_amsdu = amsdu_info == MT_RXD1_LAST_AMSDU_FRAME;
+mt7615/mac.c:		if (!hdr_trans && status->amsdu) {
+mt7615/mac.c:		status->flag |= RX_FLAG_8023;
+mt7615/mac.c:	if (!status->wcid || !ieee80211_is_data_qos(fc))
+mt7615/mac.c:	status->aggr = unicast &&
+mt7615/mac.c:	status->qos_ctl = qos_ctl;
+mt7615/mac.c:	status->seqno = IEEE80211_SEQ_TO_SN(seq_ctrl);
+mt76x02_mac.c:		if (status->band == NL80211_BAND_2GHZ)
+mt76x02_mac.c:		status->rate_idx = idx;
+mt76x02_mac.c:			status->enc_flags |= RX_ENC_FLAG_SHORTPRE;
+mt76x02_mac.c:		status->rate_idx = idx;
+mt76x02_mac.c:		status->enc_flags |= RX_ENC_FLAG_HT_GF;
+mt76x02_mac.c:		status->encoding = RX_ENC_HT;
+mt76x02_mac.c:		status->rate_idx = idx;
+mt76x02_mac.c:		status->encoding = RX_ENC_VHT;
+mt76x02_mac.c:		status->rate_idx = FIELD_GET(MT_RATE_INDEX_VHT_IDX, idx);
+mt76x02_mac.c:		status->nss = min_t(u8, n_rxstream,
+mt76x02_mac.c:		status->enc_flags |= RX_ENC_FLAG_LDPC;
+mt76x02_mac.c:		status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+mt76x02_mac.c:		status->enc_flags |= 1 << RX_ENC_FLAG_STBC_SHIFT;
+mt76x02_mac.c:		status->bw = RATE_INFO_BW_40;
+mt76x02_mac.c:		status->bw = RATE_INFO_BW_80;
+mt76x02_mac.c:		status->flag |= RX_FLAG_DECRYPTED;
+mt76x02_mac.c:		status->flag |= RX_FLAG_MMIC_STRIPPED;
+mt76x02_mac.c:		status->flag |= RX_FLAG_MIC_STRIPPED;
+mt76x02_mac.c:		status->flag |= RX_FLAG_IV_STRIPPED;
+mt76x02_mac.c:	status->wcid = mt76x02_rx_get_sta_wcid(sta, unicast);
+mt76x02_mac.c:		status->iv[0] = data[7];
+mt76x02_mac.c:		status->iv[1] = data[6];
+mt76x02_mac.c:		status->iv[2] = data[5];
+mt76x02_mac.c:		status->iv[3] = data[4];
+mt76x02_mac.c:		status->iv[4] = data[1];
+mt76x02_mac.c:		status->iv[5] = data[0];
+mt76x02_mac.c:			status->flag &= ~RX_FLAG_IV_STRIPPED;
+mt76x02_mac.c:		status->aggr = true;
+mt76x02_mac.c:		status->flag |= RX_FLAG_AMPDU_DETAILS;
+mt76x02_mac.c:		status->ampdu_ref = dev->ampdu_ref;
+mt76x02_mac.c:	status->chains = BIT(0);
+mt76x02_mac.c:	status->chain_signal[0] = signal;
+mt76x02_mac.c:		status->chains |= BIT(1);
+mt76x02_mac.c:		status->chain_signal[1] = mt76x02_mac_get_rssi(dev,
+mt76x02_mac.c:	status->freq = dev->mphy.chandef.chan->center_freq;
+mt76x02_mac.c:	status->band = dev->mphy.chandef.chan->band;
+mt76x02_mac.c:	status->qos_ctl = *ieee80211_get_qos_ctl(hdr);
+mt76x02_mac.c:	status->seqno = FIELD_GET(MT_RXWI_SN, tid_sn);
+mt7915/mac.c:	status->bw = RATE_INFO_BW_HE_RU;
+mt7915/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_26;
+mt7915/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_52;
+mt7915/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_106;
+mt7915/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_242;
+mt7915/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_484;
+mt7915/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_996;
+mt7915/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_2x996;
+mt7915/mac.c:	status->flag |= RX_FLAG_RADIOTAP_HE_MU;
+mt7915/mac.c:	he_mu->flags1 |= MU_PREP(FLAGS1_SIG_B_MCS, status->rate_idx);
+mt7915/mac.c:	if (status->he_dcm)
+mt7915/mac.c:		he_mu->flags1 |= MU_PREP(FLAGS1_SIG_B_DCM, status->he_dcm);
+mt7915/mac.c:	he_mu->flags2 |= MU_PREP(FLAGS2_BW_FROM_SIG_A_BW, status->bw) |
+mt7915/mac.c:	if (status->bw >= RATE_INFO_BW_40) {
+mt7915/mac.c:	if (status->bw >= RATE_INFO_BW_80) {
+mt7915/mac.c:	status->flag |= RX_FLAG_RADIOTAP_HE;
+mt7915/mac.c:	struct mt7915_sta *msta = (struct mt7915_sta *)status->wcid;
+mt7915/mac.c:		status->encoding = RX_ENC_HT;
+mt7915/mac.c:			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+mt7915/mac.c:		status->encoding = RX_ENC_VHT;
+mt7915/mac.c:			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+mt7915/mac.c:		status->encoding = RX_ENC_HE;
+mt7915/mac.c:			status->he_gi = gi;
+mt7915/mac.c:		status->he_dcm = dcm;
+mt7915/mac.c:	status->rate_idx = i;
+mt7915/mac.c:			status->bw = RATE_INFO_BW_HE_RU;
+mt7915/mac.c:			status->he_ru =
+mt7915/mac.c:			status->bw = RATE_INFO_BW_40;
+mt7915/mac.c:		status->bw = RATE_INFO_BW_80;
+mt7915/mac.c:		status->bw = RATE_INFO_BW_160;
+mt7915/mac.c:	status->enc_flags |= RX_ENC_FLAG_STBC_MASK * stbc;
+mt7915/mac.c:		status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+mt7915/mac.c:	status->nss = *nss;
+mt7915/mac.c:		status->ext_phy = true;
+mt7915/mac.c:		status->flag |= RX_FLAG_ONLY_MONITOR;
+mt7915/mac.c:	status->wcid = mt7915_rx_get_wcid(dev, idx, unicast);
+mt7915/mac.c:	if (status->wcid) {
+mt7915/mac.c:		msta = container_of(status->wcid, struct mt7915_sta, wcid);
+mt7915/mac.c:	status->freq = mphy->chandef.chan->center_freq;
+mt7915/mac.c:	status->band = mphy->chandef.chan->band;
+mt7915/mac.c:	if (status->band == NL80211_BAND_5GHZ)
+mt7915/mac.c:		status->flag |= RX_FLAG_FAILED_FCS_CRC;
+mt7915/mac.c:		status->flag |= RX_FLAG_MMIC_ERROR;
+mt7915/mac.c:		status->flag |= RX_FLAG_DECRYPTED;
+mt7915/mac.c:		status->flag |= RX_FLAG_IV_STRIPPED;
+mt7915/mac.c:		status->flag |= RX_FLAG_MMIC_STRIPPED | RX_FLAG_MIC_STRIPPED;
+mt7915/mac.c:		if (status->flag & RX_FLAG_DECRYPTED) {
+mt7915/mac.c:				status->iv[0] = data[5];
+mt7915/mac.c:				status->iv[1] = data[4];
+mt7915/mac.c:				status->iv[2] = data[3];
+mt7915/mac.c:				status->iv[3] = data[2];
+mt7915/mac.c:				status->iv[4] = data[1];
+mt7915/mac.c:				status->iv[5] = data[0];
+mt7915/mac.c:		status->timestamp = le32_to_cpu(rxd[0]);
+mt7915/mac.c:		status->flag |= RX_FLAG_MACTIME_START;
+mt7915/mac.c:			status->flag |= RX_FLAG_AMPDU_DETAILS;
+mt7915/mac.c:			if (phy->rx_ampdu_ts != status->timestamp) {
+mt7915/mac.c:			phy->rx_ampdu_ts = status->timestamp;
+mt7915/mac.c:			status->ampdu_ref = phy->ampdu_ref;
+mt7915/mac.c:			status->enc_flags |= RX_ENC_FLAG_LDPC;
+mt7915/mac.c:		status->chain_signal[0] = to_rssi(MT_PRXV_RCPI0, v1);
+mt7915/mac.c:		status->chain_signal[1] = to_rssi(MT_PRXV_RCPI1, v1);
+mt7915/mac.c:		status->chain_signal[2] = to_rssi(MT_PRXV_RCPI2, v1);
+mt7915/mac.c:		status->chain_signal[3] = to_rssi(MT_PRXV_RCPI3, v1);
+mt7915/mac.c:	status->amsdu = !!amsdu_info;
+mt7915/mac.c:	if (status->amsdu) {
+mt7915/mac.c:		status->first_amsdu = amsdu_info == MT_RXD4_FIRST_AMSDU_FRAME;
+mt7915/mac.c:		status->last_amsdu = amsdu_info == MT_RXD4_LAST_AMSDU_FRAME;
+mt7915/mac.c:		if (!hdr_trans && status->amsdu) {
+mt7915/mac.c:		status->flag |= RX_FLAG_8023;
+mt7915/mac.c:	if (rxv && mode >= MT_PHY_TYPE_HE_SU && !(status->flag & RX_FLAG_8023))
+mt7915/mac.c:	if (!status->wcid || !ieee80211_is_data_qos(fc))
+mt7915/mac.c:	status->aggr = unicast &&
+mt7915/mac.c:	status->qos_ctl = qos_ctl;
+mt7915/mac.c:	status->seqno = IEEE80211_SEQ_TO_SN(seq_ctrl);
+mt7921/mac.c:	status->bw = RATE_INFO_BW_HE_RU;
+mt7921/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_26;
+mt7921/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_52;
+mt7921/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_106;
+mt7921/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_242;
+mt7921/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_484;
+mt7921/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_996;
+mt7921/mac.c:		status->he_ru = NL80211_RATE_INFO_HE_RU_ALLOC_2x996;
+mt7921/mac.c:	status->flag |= RX_FLAG_RADIOTAP_HE_MU;
+mt7921/mac.c:	he_mu->flags1 |= MU_PREP(FLAGS1_SIG_B_MCS, status->rate_idx);
+mt7921/mac.c:	if (status->he_dcm)
+mt7921/mac.c:		he_mu->flags1 |= MU_PREP(FLAGS1_SIG_B_DCM, status->he_dcm);
+mt7921/mac.c:	he_mu->flags2 |= MU_PREP(FLAGS2_BW_FROM_SIG_A_BW, status->bw) |
+mt7921/mac.c:	if (status->bw >= RATE_INFO_BW_40) {
+mt7921/mac.c:	if (status->bw >= RATE_INFO_BW_80) {
+mt7921/mac.c:	status->flag |= RX_FLAG_RADIOTAP_HE;
+mt7921/mac.c:		status->freq = mphy->chandef.chan->center_freq;
+mt7921/mac.c:		status->band = mphy->chandef.chan->band;
+mt7921/mac.c:		status->band = NL80211_BAND_6GHZ;
+mt7921/mac.c:		status->band = NL80211_BAND_5GHZ;
+mt7921/mac.c:		status->band = NL80211_BAND_2GHZ;
+mt7921/mac.c:	status->freq = ieee80211_channel_to_frequency(chfreq, status->band);
+mt7921/mac.c:	if (status->signal > 0)
+mt7921/mac.c:	ewma_rssi_add(&mvif->rssi, -status->signal);
+mt7921/mac.c:	struct mt7921_sta *msta = (struct mt7921_sta *)status->wcid;
+mt7921/mac.c:		status->flag |= RX_FLAG_ONLY_MONITOR;
+mt7921/mac.c:	status->wcid = mt7921_rx_get_wcid(dev, idx, unicast);
+mt7921/mac.c:	if (status->wcid) {
+mt7921/mac.c:		msta = container_of(status->wcid, struct mt7921_sta, wcid);
+mt7921/mac.c:	switch (status->band) {
+mt7921/mac.c:		status->flag |= RX_FLAG_FAILED_FCS_CRC;
+mt7921/mac.c:		status->flag |= RX_FLAG_MMIC_ERROR;
+mt7921/mac.c:		status->flag |= RX_FLAG_DECRYPTED;
+mt7921/mac.c:		status->flag |= RX_FLAG_IV_STRIPPED;
+mt7921/mac.c:		status->flag |= RX_FLAG_MMIC_STRIPPED | RX_FLAG_MIC_STRIPPED;
+mt7921/mac.c:		if (status->flag & RX_FLAG_DECRYPTED) {
+mt7921/mac.c:				status->iv[0] = data[5];
+mt7921/mac.c:				status->iv[1] = data[4];
+mt7921/mac.c:				status->iv[2] = data[3];
+mt7921/mac.c:				status->iv[3] = data[2];
+mt7921/mac.c:				status->iv[4] = data[1];
+mt7921/mac.c:				status->iv[5] = data[0];
+mt7921/mac.c:		status->timestamp = le32_to_cpu(rxd[0]);
+mt7921/mac.c:		status->flag |= RX_FLAG_MACTIME_START;
+mt7921/mac.c:			status->flag |= RX_FLAG_AMPDU_DETAILS;
+mt7921/mac.c:			if (phy->rx_ampdu_ts != status->timestamp) {
+mt7921/mac.c:			phy->rx_ampdu_ts = status->timestamp;
+mt7921/mac.c:			status->ampdu_ref = phy->ampdu_ref;
+mt7921/mac.c:			status->enc_flags |= RX_ENC_FLAG_LDPC;
+mt7921/mac.c:		status->chains = mphy->antenna_mask;
+mt7921/mac.c:		status->chain_signal[0] = to_rssi(MT_PRXV_RCPI0, v1);
+mt7921/mac.c:		status->chain_signal[1] = to_rssi(MT_PRXV_RCPI1, v1);
+mt7921/mac.c:		status->chain_signal[2] = to_rssi(MT_PRXV_RCPI2, v1);
+mt7921/mac.c:		status->chain_signal[3] = to_rssi(MT_PRXV_RCPI3, v1);
+mt7921/mac.c:		status->signal = -128;
+mt7921/mac.c:			if (!(status->chains & BIT(i)) ||
+mt7921/mac.c:			    status->chain_signal[i] >= 0)
+mt7921/mac.c:			status->signal = max(status->signal,
+mt7921/mac.c:					     status->chain_signal[i]);
+mt7921/mac.c:			status->encoding = RX_ENC_HT;
+mt7921/mac.c:			status->nss =
+mt7921/mac.c:			status->encoding = RX_ENC_VHT;
+mt7921/mac.c:			status->nss =
+mt7921/mac.c:			status->encoding = RX_ENC_HE;
+mt7921/mac.c:				status->he_gi = gi;
+mt7921/mac.c:			status->he_dcm = !!(idx & MT_PRXV_TX_DCM);
+mt7921/mac.c:		status->rate_idx = i;
+mt7921/mac.c:				status->bw = RATE_INFO_BW_HE_RU;
+mt7921/mac.c:				status->he_ru =
+mt7921/mac.c:				status->bw = RATE_INFO_BW_40;
+mt7921/mac.c:			status->bw = RATE_INFO_BW_80;
+mt7921/mac.c:			status->bw = RATE_INFO_BW_160;
+mt7921/mac.c:		status->enc_flags |= RX_ENC_FLAG_STBC_MASK * stbc;
+mt7921/mac.c:			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+mt7921/mac.c:	status->amsdu = !!amsdu_info;
+mt7921/mac.c:	if (status->amsdu) {
+mt7921/mac.c:		status->first_amsdu = amsdu_info == MT_RXD4_FIRST_AMSDU_FRAME;
+mt7921/mac.c:		status->last_amsdu = amsdu_info == MT_RXD4_LAST_AMSDU_FRAME;
+mt7921/mac.c:		if (!hdr_trans && status->amsdu) {
+mt7921/mac.c:		status->flag |= RX_FLAG_8023;
+mt7921/mac.c:	if (rxv && mode >= MT_PHY_TYPE_HE_SU && !(status->flag & RX_FLAG_8023))
+mt7921/mac.c:	if (!status->wcid || !ieee80211_is_data_qos(fc))
+mt7921/mac.c:	status->aggr = unicast && !ieee80211_is_qos_nullfunc(fc);
+mt7921/mac.c:	status->seqno = IEEE80211_SEQ_TO_SN(seq_ctrl);
+mt7921/mac.c:	status->qos_ctl = qos_ctl;

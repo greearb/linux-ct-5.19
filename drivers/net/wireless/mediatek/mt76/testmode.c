@@ -555,6 +555,9 @@ mt76_testmode_dump_stats(struct mt76_phy *phy, struct sk_buff *msg)
 	    nla_put_u64_64bit(msg, MT76_TM_STATS_ATTR_RX_PACKETS, rx_packets,
 			      MT76_TM_STATS_ATTR_PAD) ||
 	    nla_put_u64_64bit(msg, MT76_TM_STATS_ATTR_RX_FCS_ERROR, rx_fcs_error,
+			      MT76_TM_STATS_ATTR_PAD) ||
+	    nla_put_u64_64bit(msg, MT76_TM_STATS_ATTR_RX_LEN_MISMATCH,
+			      td->rx_stats.len_mismatch,
 			      MT76_TM_STATS_ATTR_PAD))
 		return -EMSGSIZE;
 

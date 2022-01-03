@@ -620,6 +620,8 @@ struct mt76_testmode_ops {
 	int (*dump_stats)(struct mt76_phy *phy, struct sk_buff *msg);
 };
 
+#define MT_TM_FW_RX_COUNT	BIT(0)
+
 struct mt76_testmode_data {
 	enum mt76_testmode_state state;
 	u8 txo_active; /* tx overrides are active */
@@ -655,6 +657,8 @@ struct mt76_testmode_data {
 
 	u8 addr[3][ETH_ALEN];
 
+	u8 flag;
+
 	u32 tx_pending;
 	u32 tx_queued;
 	u16 tx_queued_limit;
@@ -662,6 +666,7 @@ struct mt76_testmode_data {
 	struct {
 		u64 packets[__MT_RXQ_MAX];
 		u64 fcs_error[__MT_RXQ_MAX];
+		u64 len_mismatch;
 	} rx_stats;
 };
 
