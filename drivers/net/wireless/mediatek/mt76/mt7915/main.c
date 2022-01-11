@@ -737,6 +737,9 @@ int mt7915_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 	if (ret)
 		return ret;
 
+#ifdef CONFIG_MTK_VENDOR
+	mt7915_vendor_amnt_sta_remove(mvif->phy, sta);
+#endif
 	return mt7915_mcu_add_rate_ctrl(dev, vif, sta, false);
 }
 

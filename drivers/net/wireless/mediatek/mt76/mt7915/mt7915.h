@@ -293,6 +293,35 @@ struct mt7915_hif {
 	int irq;
 };
 
+#ifdef CONFIG_MTK_VENDOR
+#define MT7915_AIR_MONITOR_MAX_ENTRY	16
+#define MT7915_AIR_MONITOR_MAX_GROUP	MT7915_AIR_MONITOR_MAX_ENTRY >> 2
+
+struct mt7915_air_monitor_group {
+	bool enable;
+	bool used[2];
+};
+
+struct mt7915_air_monitor_entry {
+	bool enable;
+
+	u8 group_idx;
+	u8 group_used_idx;
+	u8 muar_idx;
+	u8 addr[ETH_ALEN];
+	unsigned int last_seen;
+	s8 rssi[4];
+	struct ieee80211_sta *sta;
+};
+
+struct mt7915_air_monitor_ctrl {
+	u8 enable;
+
+	struct mt7915_air_monitor_group group[MT7915_AIR_MONITOR_MAX_GROUP];
+	struct mt7915_air_monitor_entry entry[MT7915_AIR_MONITOR_MAX_ENTRY];
+};
+#endif
+
 struct mt7915_phy {
 	struct mt76_phy *mt76;
 	struct mt7915_dev *dev;
@@ -353,6 +382,8 @@ struct mt7915_phy {
 		u32 interval;
 		u32 last_record;
 	} csi;
+
+	struct mt7915_air_monitor_ctrl amnt_ctrl;
 #endif
 };
 
@@ -731,6 +762,9 @@ void mt7915_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 void mt7915_vendor_register(struct mt7915_phy *phy);
 int mt7915_mcu_set_csi(struct mt7915_phy *phy, u8 mode,
 			u8 cfg, u8 v1, u32 v2, u8 *mac_addr);
+void mt7915_vendor_amnt_fill_rx(struct mt7915_phy *phy, struct sk_buff *skb);
+int mt7915_vendor_amnt_sta_remove(struct mt7915_phy *phy,
+				  struct ieee80211_sta *sta);
 #endif
 
 #ifdef MTK_DEBUG

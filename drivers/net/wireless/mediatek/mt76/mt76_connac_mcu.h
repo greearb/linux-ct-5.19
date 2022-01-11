@@ -1155,6 +1155,8 @@ enum {
 	MCU_EXT_CMD_GROUP_PRE_CAL_INFO = 0xab,
 	MCU_EXT_CMD_DPD_PRE_CAL_INFO = 0xac,
 	MCU_EXT_CMD_PHY_STAT_INFO = 0xad,
+	/* for vendor csi and air monitor */
+	MCU_EXT_CMD_SMESH_CTRL = 0xae,
 	MCU_EXT_CMD_CSI_CTRL = 0xc2,
 };
 
