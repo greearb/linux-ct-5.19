@@ -673,6 +673,14 @@ struct mt76_vif {
 	u8 cipher;
 };
 
+struct rdd_cmd_msg {
+	u8 ctrl;
+	u8 rdd_idx;
+	u8 rdd_rx_sel;
+	u8 val;
+	u8 rsv[4];
+} __packed;
+
 struct mt76_phy {
 	struct ieee80211_hw *hw;
 	struct mt76_dev *dev;
@@ -788,6 +796,10 @@ struct mt76_dev {
 
 	struct debugfs_blob_wrapper eeprom;
 	struct debugfs_blob_wrapper otp;
+
+	/* Store last-set rdd cmds for debugging cac/radar. */
+	struct rdd_cmd_msg debug_mcu_rdd_cmd[2];
+	int debug_mcu_rdd_cmd_rv[2];
 
 	struct mt76_rate_power rate_power;
 

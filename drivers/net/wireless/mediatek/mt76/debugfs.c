@@ -135,6 +135,26 @@ mt76_txs_for_all_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(fops_txs_for_all, mt76_txs_for_all_get,
 			 mt76_txs_for_all_set, "%lld\n");
 
+static int mt76_dfs_info_read(struct seq_file *s, void *data)
+{
+	struct mt76_dev *dev = dev_get_drvdata(s->private);
+	int i;
+	struct mt76_phy *phy = &dev->phy;
+
+	seq_puts(s, "     index |  ctrl/cmd |    rx-sel |       val |        rv | phy-dfs-state | requested-dfs-state |\n");
+	for (i = 0; i<ARRAY_SIZE(dev->debug_mcu_rdd_cmd_rv); i++) {
+		seq_printf(s, " %9d | %9d | %9d | %9d | %09d | %09d | %013d | %019d |\n",
+			   i, dev->debug_mcu_rdd_cmd[i].ctrl,
+			   dev->debug_mcu_rdd_cmd[i].rdd_rx_sel,
+			   dev->debug_mcu_rdd_cmd[i].val,
+			   dev->debug_mcu_rdd_cmd_rv[i],
+			   phy->dfs_state, mt76_phy_dfs_state(phy)
+			);
+	}
+
+	return 0;
+}
+
 void mt76_seq_puts_array(struct seq_file *file, const char *str,
 			 s8 *val, int len)
 {
@@ -192,6 +212,8 @@ mt76_register_debugfs_fops(struct mt76_phy *phy,
 				    mt76_read_rate_txpower);
 	debugfs_create_devm_seqfile(dev->dev, "rx-queues", dir,
 				    mt76_rx_queues_read);
+	debugfs_create_devm_seqfile(dev->dev, "dfs-info", dir,
+				    mt76_dfs_info_read);
 
 	return dir;
 }
