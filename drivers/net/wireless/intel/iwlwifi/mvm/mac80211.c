@@ -1287,9 +1287,11 @@ static int iwl_mvm_post_channel_switch(struct ieee80211_hw *hw,
 
 		if (!fw_has_capa(&mvm->fw->ucode_capa,
 				 IWL_UCODE_TLV_CAPA_CHANNEL_SWITCH_CMD)) {
-			ret = iwl_mvm_enable_beacon_filter(mvm, vif, 0);
-			if (ret)
-				goto out_unlock;
+			if (mvmvif->bf_data.bf_enabled) {
+				ret = iwl_mvm_enable_beacon_filter(mvm, vif, 0);
+				if (ret)
+					goto out_unlock;
+			}
 
 			iwl_mvm_stop_session_protection(mvm, vif);
 		}
@@ -2372,7 +2374,8 @@ static void iwl_mvm_bss_info_changed_station(struct iwl_mvm *mvm,
 		iwl_mvm_stop_session_protection(mvm, vif);
 
 		iwl_mvm_sf_update(mvm, vif, false);
-		WARN_ON(iwl_mvm_enable_beacon_filter(mvm, vif, 0));
+		if (mvmvif->bf_data.bf_enabled)
+			WARN_ON(iwl_mvm_enable_beacon_filter(mvm, vif, 0));
 	}
 
 	if (changes & (BSS_CHANGED_PS | BSS_CHANGED_P2P_PS | BSS_CHANGED_QOS |
@@ -3217,7 +3220,8 @@ static int iwl_mvm_mac_sta_state(struct ieee80211_hw *hw,
 						   NL80211_TDLS_ENABLE_LINK);
 		} else {
 			/* enable beacon filtering */
-			WARN_ON(iwl_mvm_enable_beacon_filter(mvm, vif, 0));
+			if (mvmvif->bf_data.bf_enabled)
+				WARN_ON(iwl_mvm_enable_beacon_filter(mvm, vif, 0));
 
 			mvmvif->authorized = 1;
 
