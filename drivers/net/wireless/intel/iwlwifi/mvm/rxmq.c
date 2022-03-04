@@ -282,12 +282,26 @@ static void iwl_mvm_get_signal_strength(struct iwl_mvm *mvm,
 	u32 rate_flags = rate_n_flags;
 	struct iwl_mvm_sta *mvmsta = NULL;
 
+	rx_status->chains =
+		(rate_flags & RATE_MCS_ANT_AB_MSK) >> RATE_MCS_ANT_POS;
+
 	if (sta && !(is_beacon && !my_beacon)) {
 		mvmsta = iwl_mvm_sta_from_mac80211(sta);
-		if (energy_a)
-			ewma_signal_add(&mvmsta->rx_avg_chain_signal[0], energy_a);
-		if (energy_b)
-			ewma_signal_add(&mvmsta->rx_avg_chain_signal[1], energy_b);
+		/* In cases of OFDM encodings (and maybe other cases), energy is
+		 * reported for each chain, but we do not want to average the weak
+		 * chain since it will average in a false weak reading.
+		 */
+		if (rx_status->nss >= 2) {
+			if (energy_a)
+				ewma_signal_add(&mvmsta->rx_avg_chain_signal[0], energy_a);
+			if (energy_b)
+				ewma_signal_add(&mvmsta->rx_avg_chain_signal[1], energy_b);
+		} else {
+			if (energy_a && (energy_a >= energy_b))
+				ewma_signal_add(&mvmsta->rx_avg_chain_signal[0], energy_a);
+			else if (energy_b)
+				ewma_signal_add(&mvmsta->rx_avg_chain_signal[1], energy_b);
+		}
 	}
 
 	energy_a = energy_a ? -energy_a : S8_MIN;
@@ -300,8 +314,6 @@ static void iwl_mvm_get_signal_strength(struct iwl_mvm *mvm,
 			energy_a, energy_b, max_energy);
 
 	rx_status->signal = max_energy;
-	rx_status->chains =
-		(rate_flags & RATE_MCS_ANT_AB_MSK) >> RATE_MCS_ANT_POS;
 	rx_status->chain_signal[0] = energy_a;
 	rx_status->chain_signal[1] = energy_b;
 
@@ -1906,6 +1918,45 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 			my_beacon = true;
 	}
 
+	is_sgi = format == RATE_MCS_HE_MSK ?
+		iwl_he_is_sgi(rate_n_flags) :
+		rate_n_flags & RATE_MCS_SGI_MSK;
+
+	if (!(format == RATE_MCS_CCK_MSK) && is_sgi)
+		rx_status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+	if (rate_n_flags & RATE_MCS_LDPC_MSK)
+		rx_status->enc_flags |= RX_ENC_FLAG_LDPC;
+	if (format == RATE_MCS_HT_MSK) {
+		u8 stbc = (rate_n_flags & RATE_MCS_STBC_MSK) >>
+			RATE_MCS_STBC_POS;
+		rx_status->encoding = RX_ENC_HT;
+		rx_status->rate_idx = RATE_HT_MCS_INDEX(rate_n_flags);
+		rx_status->nss = rx_status->rate_idx / 8 + 1;
+		rx_status->enc_flags |= stbc << RX_ENC_FLAG_STBC_SHIFT;
+	} else if (format == RATE_MCS_VHT_MSK) {
+		u8 stbc = (rate_n_flags & RATE_MCS_STBC_MSK) >>
+			RATE_MCS_STBC_POS;
+		rx_status->nss = ((rate_n_flags & RATE_MCS_NSS_MSK) >>
+			RATE_MCS_NSS_POS) + 1;
+		rx_status->rate_idx = rate_n_flags & RATE_MCS_CODE_MSK;
+		rx_status->encoding = RX_ENC_VHT;
+		rx_status->enc_flags |= stbc << RX_ENC_FLAG_STBC_SHIFT;
+		if (rate_n_flags & RATE_MCS_BF_MSK)
+			rx_status->enc_flags |= RX_ENC_FLAG_BF;
+	} else if (!(format == RATE_MCS_HE_MSK)) {
+		int rate = iwl_mvm_legacy_hw_idx_to_mac80211_idx(rate_n_flags,
+								 rx_status->band);
+
+		if (WARN(rate < 0 || rate > 0xFF,
+			 "Invalid rate flags 0x%x, band %d,\n",
+			 rate_n_flags, rx_status->band)) {
+			kfree_skb(skb);
+			goto out;
+		}
+		rx_status->rate_idx = rate;
+		rx_status->nss = 1;
+	}
+
 	iwl_mvm_get_signal_strength(mvm, rx_status, rate_n_flags, energy_a,
 				    energy_b, sta, is_beacon, my_beacon);
 
@@ -2004,43 +2055,6 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 
 			iwl_mvm_agg_rx_received(mvm, reorder_data, baid);
 		}
-	}
-
-	is_sgi = format == RATE_MCS_HE_MSK ?
-		iwl_he_is_sgi(rate_n_flags) :
-		rate_n_flags & RATE_MCS_SGI_MSK;
-
-	if (!(format == RATE_MCS_CCK_MSK) && is_sgi)
-		rx_status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
-	if (rate_n_flags & RATE_MCS_LDPC_MSK)
-		rx_status->enc_flags |= RX_ENC_FLAG_LDPC;
-	if (format == RATE_MCS_HT_MSK) {
-		u8 stbc = (rate_n_flags & RATE_MCS_STBC_MSK) >>
-			RATE_MCS_STBC_POS;
-		rx_status->encoding = RX_ENC_HT;
-		rx_status->rate_idx = RATE_HT_MCS_INDEX(rate_n_flags);
-		rx_status->enc_flags |= stbc << RX_ENC_FLAG_STBC_SHIFT;
-	} else if (format == RATE_MCS_VHT_MSK) {
-		u8 stbc = (rate_n_flags & RATE_MCS_STBC_MSK) >>
-			RATE_MCS_STBC_POS;
-		rx_status->nss = ((rate_n_flags & RATE_MCS_NSS_MSK) >>
-			RATE_MCS_NSS_POS) + 1;
-		rx_status->rate_idx = rate_n_flags & RATE_MCS_CODE_MSK;
-		rx_status->encoding = RX_ENC_VHT;
-		rx_status->enc_flags |= stbc << RX_ENC_FLAG_STBC_SHIFT;
-		if (rate_n_flags & RATE_MCS_BF_MSK)
-			rx_status->enc_flags |= RX_ENC_FLAG_BF;
-	} else if (!(format == RATE_MCS_HE_MSK)) {
-		int rate = iwl_mvm_legacy_hw_idx_to_mac80211_idx(rate_n_flags,
-								 rx_status->band);
-
-		if (WARN(rate < 0 || rate > 0xFF,
-			 "Invalid rate flags 0x%x, band %d,\n",
-			 rate_n_flags, rx_status->band)) {
-			kfree_skb(skb);
-			goto out;
-		}
-		rx_status->rate_idx = rate;
 	}
 
 	/* management stuff on default queue */
