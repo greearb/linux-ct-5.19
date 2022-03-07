@@ -1021,7 +1021,7 @@ static ssize_t pktgen_if_write(struct file *file,
 			pkt_dev->min_pkt_size = value;
 			pkt_dev->cur_pkt_size = value;
 		}
-		sprintf(pg_result, "OK: min_pkt_size=%u",
+		sprintf(pg_result, "OK: min_pkt_size=%d",
 			pkt_dev->min_pkt_size);
 		return count;
 	}
@@ -1038,7 +1038,7 @@ static ssize_t pktgen_if_write(struct file *file,
 			pkt_dev->max_pkt_size = value;
 			pkt_dev->cur_pkt_size = value;
 		}
-		sprintf(pg_result, "OK: max_pkt_size=%u",
+		sprintf(pg_result, "OK: max_pkt_size=%d",
 			pkt_dev->max_pkt_size);
 		return count;
 	}
@@ -1058,7 +1058,7 @@ static ssize_t pktgen_if_write(struct file *file,
 			pkt_dev->max_pkt_size = value;
 			pkt_dev->cur_pkt_size = value;
 		}
-		sprintf(pg_result, "OK: pkt_size=%u", pkt_dev->min_pkt_size);
+		sprintf(pg_result, "OK: pkt_size=%d", pkt_dev->min_pkt_size);
 		return count;
 	}
 
@@ -1080,7 +1080,7 @@ static ssize_t pktgen_if_write(struct file *file,
 		}
 		i += len;
 		pkt_dev->nfrags = value;
-		sprintf(pg_result, "OK: frags=%u", pkt_dev->nfrags);
+		sprintf(pg_result, "OK: frags=%d", pkt_dev->nfrags);
 		return count;
 	}
 
@@ -1281,7 +1281,7 @@ static ssize_t pktgen_if_write(struct file *file,
 		    (!(pkt_dev->odev->priv_flags & IFF_TX_SKB_SHARING)))
 			return -ENOTSUPP;
 		pkt_dev->burst = value < 1 ? 1 : value;
-		sprintf(pg_result, "OK: burst=%d", pkt_dev->burst);
+		sprintf(pg_result, "OK: burst=%u", pkt_dev->burst);
 		return count;
 	}
 	if (!strcmp(name, "node")) {
@@ -2251,7 +2251,7 @@ static int pktgen_setup_dev(const struct pktgen_net *pn,
 		rtnl_unlock();
 #endif
 		pkt_dev->odev->pkt_dev = NULL;
-		dev_put(pkt_dev->odev);
+		dev_put_track(pkt_dev->odev, &pkt_dev->dev_tracker);
 		pkt_dev->odev = NULL;
 	}
 
@@ -2269,6 +2269,7 @@ static int pktgen_setup_dev(const struct pktgen_net *pn,
 		err = -ENETDOWN;
 	} else {
 		pkt_dev->odev = odev;
+		netdev_tracker_alloc(odev, &pkt_dev->dev_tracker, GFP_KERNEL);
 #ifdef USE_NQW_CALLBACK
 		/* Set the nqw callback hooks */
 		rtnl_lock();
@@ -2279,7 +2280,7 @@ static int pktgen_setup_dev(const struct pktgen_net *pn,
 		return 0;
 	}
 
-	dev_put(odev);
+	dev_put_track(odev, &pkt_dev->dev_tracker);
 	return err;
 }
 
@@ -4633,7 +4634,7 @@ static int pktgen_add_device(struct pktgen_thread *t, const char *ifname)
 
 	return add_dev_to_thread(t, pkt_dev);
 out2:
-	dev_put(pkt_dev->odev);
+	dev_put_track(pkt_dev->odev, &pkt_dev->dev_tracker);
 out1:
 #ifdef CONFIG_XFRM
 	free_SAs(pkt_dev);
@@ -4669,7 +4670,7 @@ static int __init pktgen_create_thread(int cpu, struct pktgen_net *pn)
 				   cpu_to_node(cpu),
 				   "kpktgend_%d", cpu);
 	if (IS_ERR(p)) {
-		printk(KERN_ERR "pktgen: kernel_thread() failed "
+		printk(KERN_ERR "pktgen: kthread_create_on_node() failed "
 		       "for cpu %d\n", t->cpu);
 		list_del(&t->th_list);
 		kfree(t);
@@ -4735,7 +4736,7 @@ static int pktgen_remove_device(struct pktgen_thread *t,
 		rtnl_unlock();
 #endif
 		pkt_dev->odev->pkt_dev = NULL;
-		dev_put(pkt_dev->odev);
+		dev_put_track(pkt_dev->odev, &pkt_dev->dev_tracker);
 		pkt_dev->odev = NULL;
 	}
 

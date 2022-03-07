@@ -236,6 +236,7 @@ struct pktgen_dev {
 					 * the out-going device name (not when the inject is
 					 * started as it used to do.)
 					 */
+	netdevice_tracker dev_tracker;
 	char odevname[32];
 	struct flow_state *flows;
 	unsigned int cflows;	/* Concurrent flows (config) */
