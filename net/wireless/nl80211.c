@@ -1520,7 +1520,8 @@ nl80211_parse_connkeys(struct cfg80211_registered_device *rdev,
 	return ERR_PTR(err);
 }
 
-static int nl80211_key_allowed(struct wireless_dev *wdev)
+static int nl80211_key_allowed(struct wireless_dev *wdev,
+			       struct genl_info *info)
 {
 	ASSERT_WDEV_LOCK(wdev);
 
@@ -1539,6 +1540,7 @@ static int nl80211_key_allowed(struct wireless_dev *wdev)
 		/* for MLO, require driver validation of the link ID */
 		if (wdev->connected)
 			return 0;
+		GENL_SET_ERR_MSG(info, "key not allowed, no current_bss");
 		return -ENOLINK;
 	case NL80211_IFTYPE_UNSPECIFIED:
 	case NL80211_IFTYPE_OCB:
@@ -1547,6 +1549,7 @@ static int nl80211_key_allowed(struct wireless_dev *wdev)
 	case NL80211_IFTYPE_P2P_DEVICE:
 	case NL80211_IFTYPE_WDS:
 	case NUM_NL80211_IFTYPES:
+		GENL_SET_ERR_MSG(info, "key not allowed, bad iftype");
 		return -EINVAL;
 	}
 
@@ -4442,7 +4445,7 @@ static int nl80211_set_key(struct sk_buff *skb, struct genl_info *info)
 			goto out;
 		}
 
-		err = nl80211_key_allowed(dev->ieee80211_ptr);
+		err = nl80211_key_allowed(dev->ieee80211_ptr, info);
 		if (err) {
 			pr_info("set-key:  key is not allowed: %d\n", err);
 			goto out;
@@ -4472,7 +4475,7 @@ static int nl80211_set_key(struct sk_buff *skb, struct genl_info *info)
 			goto out;
 		}
 
-		err = nl80211_key_allowed(dev->ieee80211_ptr);
+		err = nl80211_key_allowed(dev->ieee80211_ptr, info);
 		if (err) {
 			pr_info("set-key: key is not allowed (!key.def), err: %d\n", err);
 			goto out;
@@ -4498,7 +4501,7 @@ static int nl80211_set_key(struct sk_buff *skb, struct genl_info *info)
 			goto out;
 		}
 
-		err = nl80211_key_allowed(dev->ieee80211_ptr);
+		err = nl80211_key_allowed(dev->ieee80211_ptr, info);
 		if (err)
 			goto out;
 
@@ -4584,9 +4587,7 @@ static int nl80211_new_key(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	wdev_lock(dev->ieee80211_ptr);
-	err = nl80211_key_allowed(dev->ieee80211_ptr);
-	if (err)
-		GENL_SET_ERR_MSG(info, "key not allowed");
+	err = nl80211_key_allowed(dev->ieee80211_ptr, info);
 	if (!err) {
 		err = rdev_add_key(rdev, dev, key.idx,
 				   key.type == NL80211_KEYTYPE_PAIRWISE,
@@ -4638,7 +4639,7 @@ static int nl80211_del_key(struct sk_buff *skb, struct genl_info *info)
 		return -EOPNOTSUPP;
 
 	wdev_lock(dev->ieee80211_ptr);
-	err = nl80211_key_allowed(dev->ieee80211_ptr);
+	err = nl80211_key_allowed(dev->ieee80211_ptr, info);
 
 	if (key.type == NL80211_KEYTYPE_GROUP && mac_addr &&
 	    !(rdev->wiphy.flags & WIPHY_FLAG_IBSS_RSN))
@@ -14936,7 +14937,7 @@ static int nl80211_set_qos_map(struct sk_buff *skb,
 	}
 
 	wdev_lock(dev->ieee80211_ptr);
-	ret = nl80211_key_allowed(dev->ieee80211_ptr);
+	ret = nl80211_key_allowed(dev->ieee80211_ptr, info);
 	if (!ret)
 		ret = rdev_set_qos_map(rdev, dev, qos_map);
 	wdev_unlock(dev->ieee80211_ptr);
