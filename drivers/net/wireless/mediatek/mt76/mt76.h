@@ -798,8 +798,8 @@ struct mt76_dev {
 	struct debugfs_blob_wrapper otp;
 
 	/* Store last-set rdd cmds for debugging cac/radar. */
-	struct rdd_cmd_msg debug_mcu_rdd_cmd[2];
-	int debug_mcu_rdd_cmd_rv[2];
+	struct rdd_cmd_msg debug_mcu_rdd_cmd[3];
+	int debug_mcu_rdd_cmd_rv[3];
 
 	struct mt76_rate_power rate_power;
 
