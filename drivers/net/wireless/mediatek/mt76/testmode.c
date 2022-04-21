@@ -25,28 +25,16 @@ const struct nla_policy mt76_tm_policy[NUM_MT76_TM_ATTRS] = {
 };
 EXPORT_SYMBOL_GPL(mt76_tm_policy);
 
-void mt76_testmode_tx_pending(struct mt76_phy *phy)
+static void
+mt76_testmode_queue_tx(struct mt76_phy *phy, struct mt76_wcid *wcid,
+		       struct sk_buff *skb, struct mt76_queue *q, int qid,
+		       u16 limit)
 {
 	struct mt76_testmode_data *td = &phy->test;
 	struct mt76_dev *dev = phy->dev;
-	struct mt76_wcid *wcid = &dev->global_wcid;
-	struct sk_buff *skb = td->tx_skb;
-	struct mt76_queue *q;
-	u16 tx_queued_limit;
-	int qid;
+	u16 count = limit;
 
-	if (!skb || !td->tx_pending)
-		return;
-
-	qid = skb_get_queue_mapping(skb);
-	q = phy->q_tx[qid];
-
-	tx_queued_limit = td->tx_queued_limit ? td->tx_queued_limit : 1000;
-
-	spin_lock_bh(&q->lock);
-
-	while (td->tx_pending > 0 &&
-	       td->tx_queued - td->tx_done < tx_queued_limit &&
+	while (td->tx_pending > 0 && count &&
 	       q->queued < q->ndesc / 2) {
 		int ret;
 
@@ -55,13 +43,65 @@ void mt76_testmode_tx_pending(struct mt76_phy *phy)
 		if (ret < 0)
 			break;
 
+		count--;
 		td->tx_pending--;
 		td->tx_queued++;
+
+		if (td->tx_rate_mode != MT76_TM_TX_MODE_HE_MU)
+		    if (td->tx_queued - td->tx_done >= limit)
+			    break;
 	}
 
 	dev->queue_ops->kick(dev, q);
+}
+
+void mt76_testmode_tx_pending(struct mt76_phy *phy)
+{
+	struct mt76_testmode_data *td = &phy->test;
+	struct mt76_testmode_entry_data *ed;
+	struct mt76_queue *q;
+	int qid;
+	u16 tx_queued_limit;
+	u32 remain;
+	bool is_mu;
+
+	if (!td->tx_pending)
+		return;
+
+	/* tx_queued_limit = td->tx_queued_limit ?: 100; */
+	tx_queued_limit = 100;
+
+	if (!td->aid) {
+		qid = skb_get_queue_mapping(td->tx_skb);
+		q = phy->q_tx[qid];
+		spin_lock_bh(&q->lock);
+		mt76_testmode_queue_tx(phy, &phy->dev->global_wcid,
+				td->tx_skb, q, qid, tx_queued_limit);
+		spin_unlock_bh(&q->lock);
+
+		return;
+	}
+
+	is_mu = td->tx_rate_mode == MT76_TM_TX_MODE_HE_MU;
+	ed = mt76_testmode_entry_data(phy, td->cur_entry);
+	qid = skb_get_queue_mapping(ed->tx_skb);
+	q = phy->q_tx[qid];
+
+	spin_lock_bh(&q->lock);
+
+	remain = is_mu ? 1 : (td->tx_pending % td->tx_count) ?: td->tx_count;
+	if (remain < tx_queued_limit)
+		tx_queued_limit = remain;
+
+	mt76_testmode_queue_tx(phy, td->cur_entry, ed->tx_skb, q, qid, tx_queued_limit);
+
+	if (td->tx_pending % td->tx_count == 0 || is_mu)
+		td->cur_entry = list_next_entry(td->cur_entry, list);
 
 	spin_unlock_bh(&q->lock);
+
+	if (is_mu && td->tx_pending)
+		mt76_worker_schedule(&phy->dev->tx_worker);
 }
 
 static u32
@@ -87,15 +127,31 @@ mt76_testmode_max_mpdu_len(struct mt76_phy *phy, u8 tx_rate_mode)
 }
 
 static void
-mt76_testmode_free_skb(struct mt76_phy *phy)
+mt76_testmode_free_skb(struct sk_buff **tx_skb)
 {
-	struct mt76_testmode_data *td = &phy->test;
+	if (!(*tx_skb))
+		return;
 
-	dev_kfree_skb(td->tx_skb);
-	td->tx_skb = NULL;
+	dev_kfree_skb(*tx_skb);
+	*tx_skb = NULL;
 }
 
-int mt76_testmode_alloc_skb(struct mt76_phy *phy, u32 len)
+static void
+mt76_testmode_free_skb_all(struct mt76_phy *phy)
+{
+	struct mt76_testmode_data *td = &phy->test;
+	struct mt76_testmode_entry_data *ed = &td->ed;
+	struct mt76_wcid *wcid;
+
+	mt76_testmode_free_skb(&ed->tx_skb);
+
+	mt76_tm_for_each_entry(phy, wcid, ed)
+		mt76_testmode_free_skb(&ed->tx_skb);
+}
+
+static int
+mt76_testmode_alloc_skb(struct mt76_phy *phy, u32 len,
+			struct sk_buff **tx_skb, u8 (*addr)[ETH_ALEN])
 {
 #define MT_TXP_MAX_LEN	4095
 	u16 fc = IEEE80211_FTYPE_DATA | IEEE80211_STYPE_DATA |
@@ -116,7 +172,8 @@ int mt76_testmode_alloc_skb(struct mt76_phy *phy, u32 len)
 	nfrags = len / MT_TXP_MAX_LEN;
 	head_len = nfrags ? MT_TXP_MAX_LEN : len;
 
-	if (len > IEEE80211_MAX_FRAME_LEN)
+	if (len > IEEE80211_MAX_FRAME_LEN ||
+	    td->tx_rate_mode == MT76_TM_TX_MODE_HE_MU)
 		fc |= IEEE80211_STYPE_QOS_DATA;
 
 	head = alloc_skb(head_len, GFP_KERNEL);
@@ -125,9 +182,9 @@ int mt76_testmode_alloc_skb(struct mt76_phy *phy, u32 len)
 
 	hdr = __skb_put_zero(head, head_len);
 	hdr->frame_control = cpu_to_le16(fc);
-	memcpy(hdr->addr1, td->addr[0], ETH_ALEN);
-	memcpy(hdr->addr2, td->addr[1], ETH_ALEN);
-	memcpy(hdr->addr3, td->addr[2], ETH_ALEN);
+	memcpy(hdr->addr1, addr[0], ETH_ALEN);
+	memcpy(hdr->addr2, addr[1], ETH_ALEN);
+	memcpy(hdr->addr3, addr[2], ETH_ALEN);
 	skb_set_queue_mapping(head, IEEE80211_AC_BE);
 
 	info = IEEE80211_SKB_CB(head);
@@ -149,7 +206,7 @@ int mt76_testmode_alloc_skb(struct mt76_phy *phy, u32 len)
 
 		frag = alloc_skb(frag_len, GFP_KERNEL);
 		if (!frag) {
-			mt76_testmode_free_skb(phy);
+			mt76_testmode_free_skb(tx_skb);
 			dev_kfree_skb(head);
 			return -ENOMEM;
 		}
@@ -162,15 +219,14 @@ int mt76_testmode_alloc_skb(struct mt76_phy *phy, u32 len)
 		frag_tail = &(*frag_tail)->next;
 	}
 
-	mt76_testmode_free_skb(phy);
-	td->tx_skb = head;
+	mt76_testmode_free_skb(tx_skb);
+	*tx_skb = head;
 
 	return 0;
 }
-EXPORT_SYMBOL(mt76_testmode_alloc_skb);
 
-static int
-mt76_testmode_tx_init(struct mt76_phy *phy)
+int mt76_testmode_init_skb(struct mt76_phy *phy, u32 len,
+			   struct sk_buff **tx_skb, u8 (*addr)[ETH_ALEN])
 {
 	struct mt76_testmode_data *td = &phy->test;
 	struct ieee80211_tx_info *info;
@@ -178,7 +234,7 @@ mt76_testmode_tx_init(struct mt76_phy *phy)
 	u8 max_nss = hweight8(phy->antenna_mask);
 	int ret;
 
-	ret = mt76_testmode_alloc_skb(phy, td->tx_mpdu_len);
+	ret = mt76_testmode_alloc_skb(phy, len, tx_skb, addr);
 	if (ret)
 		return ret;
 
@@ -188,7 +244,7 @@ mt76_testmode_tx_init(struct mt76_phy *phy)
 	if (td->tx_antenna_mask)
 		max_nss = min_t(u8, max_nss, hweight8(td->tx_antenna_mask));
 
-	info = IEEE80211_SKB_CB(td->tx_skb);
+	info = IEEE80211_SKB_CB(*tx_skb);
 	rate = &info->control.rates[0];
 	rate->count = 1;
 	rate->idx = td->tx_rate_idx;
@@ -260,6 +316,25 @@ mt76_testmode_tx_init(struct mt76_phy *phy)
 out:
 	return 0;
 }
+EXPORT_SYMBOL(mt76_testmode_init_skb);
+
+static int
+mt76_testmode_tx_init(struct mt76_phy *phy)
+{
+	struct mt76_testmode_entry_data *ed;
+	struct mt76_wcid *wcid;
+
+	mt76_tm_for_each_entry(phy, wcid, ed) {
+		int ret;
+
+		ret = mt76_testmode_init_skb(phy, ed->tx_mpdu_len,
+					     &ed->tx_skb, ed->addr);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
 
 static void
 mt76_testmode_tx_start(struct mt76_phy *phy)
@@ -270,6 +345,14 @@ mt76_testmode_tx_start(struct mt76_phy *phy)
 	td->tx_queued = 0;
 	td->tx_done = 0;
 	td->tx_pending = td->tx_count;
+	if (td->tx_rate_mode == MT76_TM_TX_MODE_HE_MU)
+		td->tx_pending = 1;
+	if (td->entry_num) {
+		td->tx_pending *= td->entry_num;
+		td->cur_entry = list_first_entry(&td->tm_entry_list,
+						 struct mt76_wcid, list);
+	}
+
 	mt76_worker_schedule(&dev->tx_worker);
 }
 
@@ -288,7 +371,7 @@ mt76_testmode_tx_stop(struct mt76_phy *phy)
 	wait_event_timeout(dev->tx_wait, td->tx_done == td->tx_queued,
 			   MT76_TM_TIMEOUT * HZ);
 
-	mt76_testmode_free_skb(phy);
+	mt76_testmode_free_skb_all(phy);
 }
 
 static inline void
@@ -319,6 +402,8 @@ mt76_testmode_init_defaults(struct mt76_phy *phy)
 	memcpy(td->addr[0], phy->macaddr, ETH_ALEN);
 	memcpy(td->addr[1], phy->macaddr, ETH_ALEN);
 	memcpy(td->addr[2], phy->macaddr, ETH_ALEN);
+
+	INIT_LIST_HEAD(&phy->test.tm_entry_list);
 }
 
 static int
@@ -328,8 +413,12 @@ __mt76_testmode_set_state(struct mt76_phy *phy, enum mt76_testmode_state state)
 	struct mt76_dev *dev = phy->dev;
 	int err;
 
-	if (prev_state == MT76_TM_STATE_TX_FRAMES)
+	if (prev_state == MT76_TM_STATE_TX_FRAMES) {
+		/* MU needs to clean hwq for free done event */
+		if (phy->test.tx_rate_mode == MT76_TM_TX_MODE_HE_MU)
+			dev->test_ops->set_state(phy, MT76_TM_STATE_IDLE);
 		mt76_testmode_tx_stop(phy);
+	}
 
 	if (state == MT76_TM_STATE_TX_FRAMES) {
 		err = mt76_testmode_tx_init(phy);
@@ -399,6 +488,44 @@ mt76_tm_get_u8(struct nlattr *attr, u8 *dest, u8 min, u8 max)
 	return 0;
 }
 
+static int
+mt76_testmode_set_eeprom(struct mt76_phy *phy, struct nlattr **tb)
+{
+	struct mt76_dev *dev = phy->dev;
+	u8 action, val[MT76_TM_EEPROM_BLOCK_SIZE];
+	u32 offset = 0;
+	int err = -EINVAL;
+
+	if (!dev->test_ops->set_eeprom)
+		return -EOPNOTSUPP;
+
+	if (mt76_tm_get_u8(tb[MT76_TM_ATTR_EEPROM_ACTION], &action,
+			   0, MT76_TM_EEPROM_ACTION_MAX))
+		goto out;
+
+	if (tb[MT76_TM_ATTR_EEPROM_OFFSET]) {
+		struct nlattr *cur;
+		int rem, idx = 0;
+
+		offset = nla_get_u32(tb[MT76_TM_ATTR_EEPROM_OFFSET]);
+		if (!!(offset % MT76_TM_EEPROM_BLOCK_SIZE) ||
+		    !tb[MT76_TM_ATTR_EEPROM_VAL])
+			goto out;
+
+		nla_for_each_nested(cur, tb[MT76_TM_ATTR_EEPROM_VAL], rem) {
+			if (nla_len(cur) != 1 || idx >= ARRAY_SIZE(val))
+				goto out;
+
+			val[idx++] = nla_get_u8(cur);
+		}
+	}
+
+	err = dev->test_ops->set_eeprom(phy, offset, val, action);
+
+out:
+	return err;
+}
+
 int mt76_testmode_cmd(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		      void *data, int len)
 {
@@ -421,6 +548,11 @@ int mt76_testmode_cmd(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	err = -EINVAL;
 
 	mutex_lock(&dev->mutex);
+
+	if (tb[MT76_TM_ATTR_EEPROM_ACTION]) {
+		err = mt76_testmode_set_eeprom(phy, tb);
+		goto out;
+	}
 
 	if (tb[MT76_TM_ATTR_RESET]) {
 		mt76_testmode_set_state(phy, MT76_TM_STATE_OFF);
@@ -448,7 +580,10 @@ int mt76_testmode_cmd(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	    mt76_tm_get_u8(tb[MT76_TM_ATTR_TX_DUTY_CYCLE],
 			   &td->tx_duty_cycle, 0, 99) ||
 	    mt76_tm_get_u8(tb[MT76_TM_ATTR_TX_POWER_CONTROL],
-			   &td->tx_power_control, 0, 1))
+			   &td->tx_power_control, 0, 1) ||
+	    mt76_tm_get_u8(tb[MT76_TM_ATTR_AID], &td->aid, 0, 16) ||
+	    mt76_tm_get_u8(tb[MT76_TM_ATTR_RU_ALLOC], &td->ru_alloc, 0, 0xff) ||
+	    mt76_tm_get_u8(tb[MT76_TM_ATTR_RU_IDX], &td->ru_idx, 0, 68))
 		goto out;
 
 	if (tb[MT76_TM_ATTR_TX_LENGTH]) {
@@ -480,8 +615,7 @@ int mt76_testmode_cmd(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	if (tb[MT76_TM_ATTR_TX_POWER]) {
 		struct nlattr *cur;
-		int idx = 0;
-		int rem;
+		int rem, idx = 0;
 
 		nla_for_each_nested(cur, tb[MT76_TM_ATTR_TX_POWER], rem) {
 			if (nla_len(cur) != 1 ||
@@ -501,8 +635,42 @@ int mt76_testmode_cmd(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			if (nla_len(cur) != ETH_ALEN || idx >= 3)
 				goto out;
 
-			memcpy(td->addr[idx], nla_data(cur), ETH_ALEN);
+			memcpy(td->addr[idx++], nla_data(cur), ETH_ALEN);
+		}
+	}
+
+	if (tb[MT76_TM_ATTR_CFG]) {
+		struct nlattr *cur;
+		int rem, idx = 0;
+
+		nla_for_each_nested(cur, tb[MT76_TM_ATTR_CFG], rem) {
+			if (nla_len(cur) != 1 || idx >= 2)
+				goto out;
+
+			if (idx == 0)
+				td->cfg.type = nla_get_u8(cur);
+			else
+				td->cfg.enable = nla_get_u8(cur);
 			idx++;
+		}
+	}
+
+	if (tb[MT76_TM_ATTR_TXBF_ACT]) {
+		struct nlattr *cur;
+		int rem, idx = 0;
+
+		if (!tb[MT76_TM_ATTR_TXBF_PARAM] ||
+		    mt76_tm_get_u8(tb[MT76_TM_ATTR_TXBF_ACT], &td->txbf_act,
+		    0, MT76_TM_TXBF_ACT_MAX))
+			goto out;
+
+		memset(td->txbf_param, 0, sizeof(td->txbf_param));
+		nla_for_each_nested(cur, tb[MT76_TM_ATTR_TXBF_PARAM], rem) {
+			if (nla_len(cur) != 2 ||
+			    idx >= ARRAY_SIZE(td->txbf_param))
+				goto out;
+
+			td->txbf_param[idx++] = nla_get_u16(cur);
 		}
 	}
 
@@ -570,6 +738,7 @@ int mt76_testmode_dump(struct ieee80211_hw *hw, struct sk_buff *msg,
 	struct mt76_phy *phy = hw->priv;
 	struct mt76_dev *dev = phy->dev;
 	struct mt76_testmode_data *td = &phy->test;
+	struct mt76_testmode_entry_data *ed = &td->ed;
 	struct nlattr *tb[NUM_MT76_TM_ATTRS] = {};
 	int err = 0;
 	void *a;
@@ -602,6 +771,19 @@ int mt76_testmode_dump(struct ieee80211_hw *hw, struct sk_buff *msg,
 		goto out;
 	}
 
+	if (tb[MT76_TM_ATTR_AID]) {
+		struct mt76_wcid *wcid;
+		u8 aid;
+
+		err = mt76_tm_get_u8(tb[MT76_TM_ATTR_AID], &aid, 1, 16);
+		if (err)
+			goto out;
+
+		mt76_tm_for_each_entry(phy, wcid, ed)
+			if (ed->aid == aid)
+				ed = mt76_testmode_entry_data(phy, wcid);
+	}
+
 	mt76_testmode_init_defaults(phy);
 
 	err = -EMSGSIZE;
@@ -614,12 +796,8 @@ int mt76_testmode_dump(struct ieee80211_hw *hw, struct sk_buff *msg,
 		goto out;
 
 	if (nla_put_u32(msg, MT76_TM_ATTR_TX_COUNT, td->tx_count) ||
-	    nla_put_u32(msg, MT76_TM_ATTR_TX_LENGTH, td->tx_mpdu_len) ||
 	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_MODE, td->tx_rate_mode) ||
-	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_NSS, td->tx_rate_nss) ||
-	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_IDX, td->tx_rate_idx) ||
 	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_SGI, td->tx_rate_sgi) ||
-	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_LDPC, td->tx_rate_ldpc) ||
 	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_STBC, td->tx_rate_stbc) ||
 	    (mt76_testmode_param_present(td, MT76_TM_ATTR_TX_LTF) &&
 	     nla_put_u8(msg, MT76_TM_ATTR_TX_LTF, td->tx_ltf)) ||
@@ -637,6 +815,15 @@ int mt76_testmode_dump(struct ieee80211_hw *hw, struct sk_buff *msg,
 	     nla_put_u8(msg, MT76_TM_ATTR_TX_POWER_CONTROL, td->tx_power_control)) ||
 	    (mt76_testmode_param_present(td, MT76_TM_ATTR_FREQ_OFFSET) &&
 	     nla_put_u8(msg, MT76_TM_ATTR_FREQ_OFFSET, td->freq_offset)))
+		goto out;
+
+	if (nla_put_u32(msg, MT76_TM_ATTR_TX_LENGTH, ed->tx_mpdu_len) ||
+	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_NSS, ed->tx_rate_nss) ||
+	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_IDX, ed->tx_rate_idx) ||
+	    nla_put_u8(msg, MT76_TM_ATTR_TX_RATE_LDPC, ed->tx_rate_ldpc) ||
+	    nla_put_u8(msg, MT76_TM_ATTR_AID, ed->aid) ||
+	    nla_put_u8(msg, MT76_TM_ATTR_RU_ALLOC, ed->ru_alloc) ||
+	    nla_put_u8(msg, MT76_TM_ATTR_RU_IDX, ed->ru_idx))
 		goto out;
 
 	if (mt76_testmode_param_present(td, MT76_TM_ATTR_TX_POWER)) {

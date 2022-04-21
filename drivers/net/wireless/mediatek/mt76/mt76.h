@@ -618,6 +618,21 @@ struct mt76_testmode_ops {
 	int (*set_params)(struct mt76_phy *phy, struct nlattr **tb,
 			  enum mt76_testmode_state new_state);
 	int (*dump_stats)(struct mt76_phy *phy, struct sk_buff *msg);
+	int (*set_eeprom)(struct mt76_phy *phy, u32 offset, u8 *val, u8 action);
+};
+
+struct mt76_testmode_entry_data {
+	struct sk_buff *tx_skb;
+
+	u16 tx_mpdu_len;
+	u8 tx_rate_idx;
+	u8 tx_rate_nss;
+	u8 tx_rate_ldpc;
+
+	u8 addr[3][ETH_ALEN];
+	u8 aid;
+	u8 ru_alloc;
+	u8 ru_idx;
 };
 
 #define MT_TM_FW_RX_COUNT	BIT(0)
@@ -627,16 +642,11 @@ struct mt76_testmode_data {
 	u8 txo_active; /* tx overrides are active */
 
 	u32 param_set[DIV_ROUND_UP(NUM_MT76_TM_ATTRS, 32)];
-	struct sk_buff *tx_skb;
 
 	u32 tx_count;
-	u16 tx_mpdu_len;
 
 	u8 tx_rate_mode;
-	u8 tx_rate_idx;
-	u8 tx_rate_nss;
 	u8 tx_rate_sgi;
-	u8 tx_rate_ldpc;
 	u8 tx_rate_stbc;
 	u8 tx_ltf;
 	u8 txbw; /* specify TX bandwidth: 0 20Mhz, 1 40Mhz, 2 80Mhz, 3 160Mhz */
@@ -655,9 +665,36 @@ struct mt76_testmode_data {
 	u8 tx_power[4];
 	u8 tx_power_control;
 
-	u8 addr[3][ETH_ALEN];
+	struct list_head tm_entry_list;
+	struct mt76_wcid *cur_entry;
+	u8 entry_num;
+	union {
+		struct mt76_testmode_entry_data ed;
+		struct {
+			/* must be the same as mt76_testmode_entry_data */
+			struct sk_buff *tx_skb;
+
+			u16 tx_mpdu_len;
+			u8 tx_rate_idx;
+			u8 tx_rate_nss;
+			u8 tx_rate_ldpc;
+
+			u8 addr[3][ETH_ALEN];
+			u8 aid;
+			u8 ru_alloc;
+			u8 ru_idx;
+		};
+	};
 
 	u8 flag;
+
+	struct {
+		u8 type;
+		u8 enable;
+	} cfg;
+
+	u8 txbf_act;
+	u16 txbf_param[8];
 
 	u32 tx_pending;
 	u32 tx_queued;
@@ -1253,6 +1290,59 @@ static inline bool mt76_testmode_enabled(struct mt76_phy *phy)
 #endif
 }
 
+#ifdef CONFIG_NL80211_TESTMODE
+static inline struct mt76_wcid *
+mt76_testmode_first_entry(struct mt76_phy *phy)
+{
+	if (list_empty(&phy->test.tm_entry_list) && !phy->test.aid)
+		return &phy->dev->global_wcid;
+
+	return list_first_entry(&phy->test.tm_entry_list,
+				typeof(struct mt76_wcid),
+				list);
+}
+
+static inline struct mt76_testmode_entry_data *
+mt76_testmode_entry_data(struct mt76_phy *phy, struct mt76_wcid *wcid)
+{
+	if (!wcid)
+		return NULL;
+	if (wcid == &phy->dev->global_wcid)
+		return &phy->test.ed;
+
+	return (struct mt76_testmode_entry_data *)((u8 *)wcid +
+						   phy->hw->sta_data_size);
+}
+
+#define mt76_tm_for_each_entry(phy, wcid, ed)				\
+	for (wcid = mt76_testmode_first_entry(phy),			\
+	     ed = mt76_testmode_entry_data(phy, wcid);			\
+	     ((phy->test.aid &&						\
+	       !list_entry_is_head(wcid, &phy->test.tm_entry_list, list)) ||	\
+	      (!phy->test.aid && wcid == &phy->dev->global_wcid)) && ed;	\
+	     wcid = list_next_entry(wcid, list),			\
+	     ed = mt76_testmode_entry_data(phy, wcid))
+#endif
+
+static inline bool __mt76_is_testmode_skb(struct mt76_phy *phy,
+					  struct sk_buff *skb)
+{
+#ifdef CONFIG_NL80211_TESTMODE
+	struct mt76_testmode_entry_data *ed = &phy->test.ed;
+	struct mt76_wcid *wcid;
+
+	if (skb == ed->tx_skb)
+		return true;
+
+	mt76_tm_for_each_entry(phy, wcid, ed)
+		if (skb == ed->tx_skb)
+			return true;
+	return false;
+#else
+	return false;
+#endif
+}
+
 static inline bool mt76_is_testmode_skb(struct mt76_dev *dev,
 					struct sk_buff *skb,
 					struct ieee80211_hw **hw)
@@ -1263,7 +1353,8 @@ static inline bool mt76_is_testmode_skb(struct mt76_dev *dev,
 	for (i = 0; i < ARRAY_SIZE(dev->phys); i++) {
 		struct mt76_phy *phy = dev->phys[i];
 
-		if (phy && skb == phy->test.tx_skb) {
+		if (phy && mt76_testmode_enabled(phy) &&
+		    __mt76_is_testmode_skb(phy, skb)) {
 			*hw = dev->phys[i]->hw;
 			return true;
 		}
@@ -1364,7 +1455,8 @@ int mt76_testmode_cmd(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 int mt76_testmode_dump(struct ieee80211_hw *hw, struct sk_buff *skb,
 		       struct netlink_callback *cb, void *data, int len);
 int mt76_testmode_set_state(struct mt76_phy *phy, enum mt76_testmode_state state);
-int mt76_testmode_alloc_skb(struct mt76_phy *phy, u32 len);
+int mt76_testmode_init_skb(struct mt76_phy *phy, u32 len,
+			   struct sk_buff **tx_skb, u8 (*addr)[ETH_ALEN]);
 
 static inline void mt76_testmode_reset(struct mt76_phy *phy, bool disable)
 {

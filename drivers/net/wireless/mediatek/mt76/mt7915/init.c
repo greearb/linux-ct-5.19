@@ -587,7 +587,7 @@ static void mt7915_init_work(struct work_struct *work)
 	struct mt7915_dev *dev = container_of(work, struct mt7915_dev,
 				 init_work);
 
-	mt7915_mcu_set_eeprom(dev);
+	mt7915_mcu_set_eeprom(dev, dev->flash_mode);
 	mt7915_mac_init(dev);
 	mt7915_init_txpower(dev, &dev->mphy.sband_2g.sband);
 	mt7915_init_txpower(dev, &dev->mphy.sband_5g.sband);

@@ -53,6 +53,7 @@ enum offs_rev {
 	ARB_DRNGR0,
 	ARB_SCR,
 	RMAC_MIB_AIRTIME14,
+	AGG_AALCR0,
 	AGG_AWSCR0,
 	AGG_PCR0,
 	AGG_ACR0,
@@ -526,6 +527,8 @@ enum offs_rev {
 #define MT_WF_AGG_BASE(_band)		((_band) ? 0x820f2000 : 0x820e2000)
 #define MT_WF_AGG(_band, ofs)		(MT_WF_AGG_BASE(_band) + (ofs))
 
+#define MT_AGG_AALCR0(_band, _n)	MT_WF_AGG(_band, (__OFFS(AGG_AALCR0) +	\
+			                                  (_n) * 4))
 #define MT_AGG_AWSCR0(_band, _n)	MT_WF_AGG(_band, (__OFFS(AGG_AWSCR0) +	\
 							  (_n) * 4))
 #define MT_AGG_PCR0(_band, _n)		MT_WF_AGG(_band, (__OFFS(AGG_PCR0) +	\

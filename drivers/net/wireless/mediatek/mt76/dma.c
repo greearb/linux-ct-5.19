@@ -433,8 +433,7 @@ free:
 	if (mt76_is_testmode_skb(dev, skb, &hw)) {
 		struct mt76_phy *phy = hw->priv;
 
-		if (tx_info.skb == phy->test.tx_skb)
-			phy->test.tx_done--;
+		phy->test.tx_done--;
 	}
 #endif
 

@@ -8,10 +8,15 @@
 
 enum {
 	MCU_ATE_SET_TRX = 0x1,
+	MCU_ATE_SET_TSSI = 0x5,
+	MCU_ATE_SET_DPD = 0x6,
+	MCU_ATE_SET_RATE_POWER_OFFSET = 0x7,
+	MCU_ATE_SET_THERMAL_COMP = 0x8,
 	MCU_ATE_SET_FREQ_OFFSET = 0xa,
 	MCU_ATE_SET_PHY_COUNT = 0x11,
 	MCU_ATE_SET_SLOT_TIME = 0x13,
 	MCU_ATE_CLEAN_TXQUEUE = 0x1c,
+	MCU_ATE_SET_MU_RX_AID = 0x1e,
 };
 
 struct mt7915_mcu_thermal_ctrl {
@@ -432,6 +437,12 @@ enum {
 
 enum {
 	MT_BF_SOUNDING_ON = 1,
+	MT_BF_DATA_PACKET_APPLY = 2,
+	MT_BF_PFMU_TAG_READ = 5,
+	MT_BF_PFMU_TAG_WRITE = 6,
+	MT_BF_PHASE_CAL = 14,
+	MT_BF_IBF_PHASE_COMP = 15,
+	MT_BF_PROFILE_WRITE_ALL = 17,
 	MT_BF_TYPE_UPDATE = 20,
 	MT_BF_MODULE_UPDATE = 25
 };
@@ -673,10 +684,19 @@ struct mt7915_muru {
 #define MURU_OFDMA_SCH_TYPE_UL          BIT(1)
 
 /* Common Config */
-#define MURU_COMM_PPDU_FMT              BIT(0)
-#define MURU_COMM_SCH_TYPE              BIT(1)
-#define MURU_COMM_SET                   (MURU_COMM_PPDU_FMT | MURU_COMM_SCH_TYPE)
-/* DL&UL User config*/
+/* #define MURU_COMM_PPDU_FMT              BIT(0) */
+/* #define MURU_COMM_SCH_TYPE              BIT(1) */
+/* #define MURU_COMM_SET                   (MURU_COMM_PPDU_FMT | MURU_COMM_SCH_TYPE) */
+#define MURU_COMM_PPDU_FMT     BIT(0)
+#define MURU_COMM_SCH_TYPE     BIT(1)
+#define MURU_COMM_BAND         BIT(2)
+#define MURU_COMM_WMM          BIT(3)
+#define MURU_COMM_SPE_IDX      BIT(4)
+#define MURU_COMM_PROC_TYPE        BIT(5)
+#define MURU_COMM_SET      (MURU_COMM_PPDU_FMT | MURU_COMM_BAND | \
+				MURU_COMM_WMM | MURU_COMM_SPE_IDX)
+
+/* DL&UL User config */
 #define MURU_USER_CNT                   BIT(4)
 
 enum {

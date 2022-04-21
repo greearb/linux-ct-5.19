@@ -634,10 +634,11 @@ mt7915_mac_write_txwi_tm(struct mt7915_phy *phy, struct mt76_wcid *wcid, __le32 
 			 struct sk_buff *skb)
 {
 	struct mt76_testmode_data *td;
+	struct mt76_testmode_entry_data *ed;
+	struct mt76_wcid *wcid;
 	const struct ieee80211_rate *r;
 	struct mt7915_sta *msta;
-	u8 bw, mode, nss;
-	u8 rate_idx;
+	u8 bw, mode, nss, rate_idx, ldpc;
 	u16 rateval = 0;
 	u32 val;
 	bool cck = false;
@@ -649,6 +650,26 @@ mt7915_mac_write_txwi_tm(struct mt7915_phy *phy, struct mt76_wcid *wcid, __le32 
 	if (msta->test.txo_active) {
 		td = &msta->test;
 	} else {
+		if (td->tx_rate_mode == MT76_TM_TX_MODE_HE_MU) {
+			txwi[1] |= cpu_to_le32(BIT(18));
+			txwi[2] = 0;
+			txwi[3] &= ~cpu_to_le32(MT_TXD3_NO_ACK);
+			le32p_replace_bits(&txwi[3], 0x1f, MT_TXD3_REM_TX_COUNT);
+			return;
+		}
+
+		if (!ed) {
+			return;
+		}
+
+		mt76_tm_for_each_entry(phy->mt76, wcid, ed)
+			if (ed->tx_skb == skb)
+				break;
+
+		nss = ed->tx_rate_nss;
+		rate_idx = ed->tx_rate_idx;
+		ldpc = ed->tx_rate_ldpc;
+
 		if (skb != phy->mt76->test.tx_skb)
 			return;
 		td = &phy->mt76->test;
@@ -725,6 +746,7 @@ mt7915_mac_write_txwi_tm(struct mt7915_phy *phy, struct mt76_wcid *wcid, __le32 
 		   FIELD_PREP(MT_TX_RATE_MODE, mode) |
 		   FIELD_PREP(MT_TX_RATE_NSS, nss - 1);
 
+	// TODO:  Check MODE_HE_MU logic, see above.
 	txwi[2] |= cpu_to_le32(MT_TXD2_FIX_RATE);
 
 	if (msta->test.txo_active) {
@@ -760,13 +782,20 @@ mt7915_mac_write_txwi_tm(struct mt7915_phy *phy, struct mt76_wcid *wcid, __le32 
 	 * - 1x, 2x LTF + 1.6us GI
 	 * - 4x LTF + 3.2us GI
 	 */
+	if (mode == MT_PHY_TYPE_HE_MU) {
+		txwi[1] |= cpu_to_le32(BIT(18));
+	}
+	
 	if (mode >= MT_PHY_TYPE_HE_SU)
 		val |= FIELD_PREP(MT_TXD6_HELTF, td->tx_ltf);
 
-	if (td->tx_rate_ldpc || (bw > 0 && mode >= MT_PHY_TYPE_HE_SU))
+	if (ldpc || (bw > 0 && mode >= MT_PHY_TYPE_HE_SU))
 		val |= MT_TXD6_LDPC;
 
 	txwi[3] &= ~cpu_to_le32(MT_TXD3_SN_VALID);
+	if (phy->test.bf_en)
+		val |= MT_TXD6_TX_IBF | MT_TXD6_TX_EBF;
+
 	txwi[6] |= cpu_to_le32(val);
 
 	if (msta->test.txo_active) {

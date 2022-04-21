@@ -412,6 +412,11 @@ mt7915_mcu_rx_log_message(struct mt7915_dev *dev, struct sk_buff *skb)
 		mt76_connac_mcu_coredump_event(&dev->mt76, skb,
 					       &dev->coredump);
 		break;
+#ifdef CONFIG_NL80211_TESTMODE
+	case MCU_EXT_EVENT_BF_STATUS_READ:
+		mt7915_tm_txbf_status_read(dev, skb);
+		break;
+#endif
 	default:
 		type = "unknown";
 		break;
@@ -513,6 +518,7 @@ void mt7915_mcu_rx_event(struct mt7915_dev *dev, struct sk_buff *skb)
 	    rxd->ext_eid == MCU_EXT_EVENT_ASSERT_DUMP ||
 	    rxd->ext_eid == MCU_EXT_EVENT_PS_SYNC ||
 	    rxd->ext_eid == MCU_EXT_EVENT_BCC_NOTIFY ||
+	    rxd->ext_eid == MCU_EXT_EVENT_BF_STATUS_READ ||
 	    !rxd->seq)
 		mt7915_mcu_rx_unsolicited_event(dev, skb);
 	else
@@ -2947,14 +2953,14 @@ static int mt7915_mcu_set_eeprom_flash(struct mt7915_dev *dev)
 	return 0;
 }
 
-int mt7915_mcu_set_eeprom(struct mt7915_dev *dev)
+int mt7915_mcu_set_eeprom(struct mt7915_dev *dev, bool flash_mode)
 {
 	struct mt7915_mcu_eeprom req = {
 		.buffer_mode = EE_MODE_EFUSE,
 		.format = EE_FORMAT_WHOLE,
 	};
 
-	if (dev->flash_mode)
+	if (flash_mode)
 		return mt7915_mcu_set_eeprom_flash(dev);
 
 	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(EFUSE_BUFFER_MODE),

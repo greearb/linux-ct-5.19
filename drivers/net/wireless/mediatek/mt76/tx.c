@@ -277,8 +277,7 @@ void __mt76_tx_complete_skb(struct mt76_dev *dev, u16 wcid_idx, struct sk_buff *
 	if (mt76_is_testmode_skb(dev, skb, &hw)) {
 		struct mt76_phy *phy = hw->priv;
 
-		if (skb == phy->test.tx_skb)
-			phy->test.tx_done++;
+		phy->test.tx_done++;
 		if (phy->test.tx_queued == phy->test.tx_done)
 			wake_up(&dev->tx_wait);
 
