@@ -264,7 +264,7 @@ static void mt7915_led_set_brightness(struct led_classdev *led_cdev,
 		mt7915_led_set_config(led_cdev, 0xff, 0);
 }
 
-static void
+void
 mt7915_init_txpower(struct mt7915_dev *dev,
 		    struct ieee80211_supported_band *sband)
 {
@@ -457,7 +457,7 @@ mt7915_mac_init_band(struct mt7915_dev *dev, u8 band)
 		       dev->rx_group_5_enable);
 }
 
-static void mt7915_mac_init(struct mt7915_dev *dev)
+void mt7915_mac_init(struct mt7915_dev *dev)
 {
 	int i;
 	u32 rx_len = is_mt7915(&dev->mt76) ? 0x400 : 0x680;
@@ -490,7 +490,7 @@ static void mt7915_mac_init(struct mt7915_dev *dev)
 	}
 }
 
-static int mt7915_txbf_init(struct mt7915_dev *dev)
+int mt7915_txbf_init(struct mt7915_dev *dev)
 {
 	int ret;
 
@@ -1137,6 +1137,8 @@ int mt7915_register_device(struct mt7915_dev *dev)
 	}
 
 	mt7915_init_debugfs(&dev->phy);
+
+	dev->ser.hw_init_done = true;
 
 	return 0;
 

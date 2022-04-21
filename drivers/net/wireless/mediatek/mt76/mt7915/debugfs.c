@@ -49,12 +49,17 @@ static ssize_t
 mt7915_fw_ser_set(struct file *file, const char __user *user_buf,
 		  size_t count, loff_t *ppos)
 {
+#define SER_LEVEL	GENMASK(3, 0)
+#define SER_ACTION	GENMASK(11, 8)
+
 	struct mt7915_phy *phy = file->private_data;
 	struct mt7915_dev *dev = phy->dev;
-	bool ext_phy = phy != &dev->phy;
+	u8 ser_action, ser_set, set_val;
+	u8 band_idx = phy->band_idx;
 	char buf[16];
 	int ret = 0;
 	u16 val;
+	u32 intr;
 
 	if (count >= sizeof(buf))
 		return -EINVAL;
@@ -70,28 +75,71 @@ mt7915_fw_ser_set(struct file *file, const char __user *user_buf,
 	if (kstrtou16(buf, 0, &val))
 		return -EINVAL;
 
-	switch (val) {
+	ser_action = FIELD_GET(SER_ACTION, val);
+	ser_set = set_val = FIELD_GET(SER_LEVEL, val);
+
+	switch (ser_action) {
 	case SER_QUERY:
 		/* grab firmware SER stats */
-		ret = mt7915_mcu_set_ser(dev, 0, 0, ext_phy);
+		ser_set = 0;
 		break;
-	case SER_SET_RECOVER_L1:
-	case SER_SET_RECOVER_L2:
-	case SER_SET_RECOVER_L3_RX_ABORT:
-	case SER_SET_RECOVER_L3_TX_ABORT:
-	case SER_SET_RECOVER_L3_TX_DISABLE:
-	case SER_SET_RECOVER_L3_BF:
-		ret = mt7915_mcu_set_ser(dev, SER_ENABLE, BIT(val), ext_phy);
-		if (ret)
-			return ret;
+	case SER_SET:
+		/*
+		 * 0x100: disable system error recovery function.
+		 * 0x101: enable system error recovery function.
+		 * 0x103: enable l0.5 recover function.
+		 */
+		ser_set = !!set_val;
 
-		ret = mt7915_mcu_set_ser(dev, SER_RECOVER, val, ext_phy);
+		dev->ser.reset_enable = ser_set;
+		intr = mt76_rr(dev, MT_WFDMA0_MCU_HOST_INT_ENA);
+		if (dev->ser.reset_enable)
+			intr |= MT_MCU_CMD_WDT_MASK;
+		else
+			intr &= ~MT_MCU_CMD_WDT_MASK;
+		mt76_set(dev, MT_WFDMA0_MCU_HOST_INT_ENA, intr);
+		break;
+	case SER_ENABLE:
+		/*
+		 * 0x200: enable system error tracking.
+		 * 0x201: enable system error L1 recover.
+		 * 0x202: enable system error L2 recover.
+		 * 0x203: enable system error L3 rx abort.
+		 * 0x204: enable system error L3 tx abort.
+		 * 0x205: enable system error L3 tx disable.
+		 * 0x206: enable system error L3 bf recover.
+		 * 0x207: enable system error all recover.
+		 */
+		ser_set = set_val > 7 ? 0x7f : BIT(set_val);
+		break;
+	case SER_RECOVER:
+		/*
+		 * 0x300: trigger L0.5 recover.
+		 * 0x301: trigger L1 recover.
+		 * 0x302: trigger L2 recover.
+		 * 0x303: trigger L3 rx abort.
+		 * 0x304: trigger L3 tx abort
+		 * 0x305: trigger L3 tx disable.
+		 * 0x306: trigger L3 bf recover.
+		 */
+		if (!ser_set) {
+			if (dev->ser.reset_enable) {
+				dev->reset_state |= MT_MCU_CMD_WDT_MASK;
+				mt7915_reset(dev);
+			} else {
+				dev_info(dev->mt76.dev, "SER: chip full recovery not enable\n");
+			}
+			goto out;
+		}
 		break;
 	default:
-		break;
+		goto out;
 	}
-
-	return ret ? ret : count;
+	ret = mt7915_mcu_set_ser(dev, ser_action, ser_set, band_idx);
+	if (ret)
+		return ret;
+out:
+	return count;
 }
 
 static ssize_t
@@ -139,6 +187,12 @@ mt7915_fw_ser_get(struct file *file, char __user *user_buf,
 	desc += scnprintf(buff + desc, bufsz - desc,
 			  "::E  R , SER_LMAC_WISR7_B1 = 0x%08x\n",
 			  mt76_rr(dev, MT_SWDEF_LAMC_WISR7_BN1_STATS));
+
+	desc += scnprintf(buff + desc, bufsz - desc,
+			  "\nWF RESET STATUS: EN %d, WM %d, WA %d\n",
+			  dev->ser.reset_enable,
+			  dev->ser.wf_reset_wm_count,
+			  dev->ser.wf_reset_wa_count);
 
 	ret = simple_read_from_buffer(user_buf, count, ppos, buff, desc);
 	kfree(buff);

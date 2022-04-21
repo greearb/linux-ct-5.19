@@ -375,6 +375,15 @@ struct mt7915_dev {
 	struct work_struct reset_work;
 	wait_queue_head_t reset_wait;
 	u32 reset_state;
+	struct {
+		bool hw_full_reset:1;
+		bool hw_init_done:1;
+		bool reset_enable:1;
+		u32 reset_type;
+		u32 cmd_fail_cnt;
+		u32 wf_reset_wm_count;
+		u32 wf_reset_wa_count;
+	}ser;
 
 	struct list_head sta_rc_list;
 	struct list_head sta_poll_list;
@@ -416,6 +425,12 @@ enum {
 	WFDMA1,
 	WFDMA_EXT,
 	__MT_WFDMA_MAX,
+};
+
+enum {
+	SER_TYPE_NONE,
+	SER_TYPE_PARTIAL_RESET,
+	SER_TYPE_FULL_RESET,
 };
 
 enum {
@@ -515,6 +530,14 @@ s8 mt7915_eeprom_get_power_delta(struct mt7915_dev *dev, int band);
 int mt7915_dma_init(struct mt7915_dev *dev, struct mt7915_phy *phy2);
 void mt7915_dma_prefetch(struct mt7915_dev *dev);
 void mt7915_dma_cleanup(struct mt7915_dev *dev);
+void mt7915_reset(struct mt7915_dev *dev);
+int mt7915_dma_reset(struct mt7915_dev *dev, bool force);
+int __mt7915_start(struct ieee80211_hw *hw);
+void mt7915_init_txpower(struct mt7915_dev *dev,
+		    struct ieee80211_supported_band *sband);
+int mt7915_txbf_init(struct mt7915_dev *dev);
+void mt7915_mac_init(struct mt7915_dev *dev);
+int mt7915_run_firmware(struct mt7915_dev *dev);
 int mt7915_mcu_init(struct mt7915_dev *dev);
 int mt7915_mcu_twt_agrt_update(struct mt7915_dev *dev,
 			       struct mt7915_vif *mvif,

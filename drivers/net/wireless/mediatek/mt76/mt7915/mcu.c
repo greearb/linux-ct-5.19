@@ -152,9 +152,64 @@ mt7915_mcu_set_sta_ht_mcs(struct ieee80211_sta *sta, u8 *ht_mcs,
 }
 
 static int
+mt7915_fw_exception_chk(struct mt7915_dev *dev)
+{
+	u32 reg_val;
+
+	reg_val = mt76_rr(dev, MT_EXCEPTION_ADDR);
+
+	if (is_mt7915(&dev->mt76))
+		reg_val >>= 8;
+
+	return !!(reg_val & 0xff);
+}
+
+static void
+mt7915_fw_heart_beat_chk(struct mt7915_dev *dev)
+{
+#define WM_TIMEOUT_COUNT_CHECK 5
+#define WM_HANG_COUNT_CHECK 9
+	static u32 cidx_rec[5], didx_rec[5];
+	u32 cnt, cidx, didx, queue;
+	u32 idx, i;
+
+	if (dev->ser.hw_full_reset)
+		return;
+
+	if (dev->ser.cmd_fail_cnt >= WM_TIMEOUT_COUNT_CHECK) {
+		cnt = mt76_rr(dev, WF_WFDMA_MEM_DMA_RX_RING_CTL + 4);
+		cidx = mt76_rr(dev, WF_WFDMA_MEM_DMA_RX_RING_CTL + 8);
+		didx = mt76_rr(dev, WF_WFDMA_MEM_DMA_RX_RING_CTL + 12);
+		queue = (didx > cidx) ?
+			(didx - cidx - 1) : (didx - cidx + cnt - 1);
+
+		idx = (dev->ser.cmd_fail_cnt - WM_TIMEOUT_COUNT_CHECK) % 5;
+		cidx_rec[idx] = cidx;
+		didx_rec[idx] = didx;
+
+		if ((cnt - 1) == queue &&
+		    dev->ser.cmd_fail_cnt >= WM_HANG_COUNT_CHECK) {
+
+			for (i = 0; i < 5; i++) {
+				if (cidx_rec[i] != cidx ||
+				    didx_rec[i] != didx)
+					return;
+			}
+			dev_err(dev->mt76.dev, "detect mem dma hang!\n");
+			if (dev->ser.reset_enable) {
+				dev->reset_state |= MT_MCU_CMD_WDT_MASK;
+				mt7915_reset(dev);
+			}
+			dev->ser.cmd_fail_cnt = 0;
+		}
+	}
+}
+
+static int
 mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 			  struct sk_buff *skb, int seq)
 {
+	struct mt7915_dev *dev = container_of(mdev, struct mt7915_dev, mt76);
 	struct mt76_connac2_mcu_rxd *rxd;
 	int ret = 0;
 
@@ -170,12 +225,27 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 			FIELD_GET(__MCU_CMD_FIELD_EXT_ID, cmd), seq,
 			mdev->last_successful_mcu_cmd);
 
+		dev->ser.cmd_fail_cnt++;
+
+		if (dev->ser.cmd_fail_cnt < 5) {
+			int exp_type = mt7915_fw_exception_chk(dev);
+
+			dev_err(mdev->dev, "Fw is status(%d) ser.reset_enable: %d\n",
+				exp_type, dev->ser.reset_enable);
+			if (exp_type && dev->ser.reset_enable) {
+				dev->reset_state |= MT_MCU_CMD_WDT_MASK;
+				mt7915_reset(dev);
+			}
+		}
+		mt7915_fw_heart_beat_chk(dev);
+
 		if (!mdev->first_failed_mcu_cmd)
 			mdev->first_failed_mcu_cmd = cmd;
 		return -ETIMEDOUT;
 	}
 
 	mdev->last_successful_mcu_cmd = cmd;
+	dev->ser.cmd_fail_cnt = 0;
 
 	if (mdev->first_failed_mcu_cmd) {
 		dev_err(mdev->dev, "MCU: First success after failure: Message %08x (cid %lx ext_cid: %lx seq %d)\n",
@@ -2341,17 +2411,9 @@ mt7915_mcu_init_rx_airtime(struct mt7915_dev *dev)
 				 sizeof(req), true);
 }
 
-int mt7915_mcu_init(struct mt7915_dev *dev)
+int mt7915_run_firmware(struct mt7915_dev *dev)
 {
-	static const struct mt76_mcu_ops mt7915_mcu_ops = {
-		.headroom = sizeof(struct mt76_connac2_mcu_txd),
-		.mcu_skb_send_msg = mt7915_mcu_send_message,
-		.mcu_parse_response = mt7915_mcu_parse_response,
-		.mcu_restart = mt76_connac_mcu_restart,
-	};
 	int ret;
-
-	dev->mt76.mcu_ops = &mt7915_mcu_ops;
 
 	/* force firmware operation mode into normal state,
 	 * which should be set before firmware download stage.
@@ -2422,6 +2484,20 @@ int mt7915_mcu_init(struct mt7915_dev *dev)
 
 	return mt7915_mcu_wa_cmd(dev, MCU_WA_PARAM_CMD(SET),
 				 MCU_WA_PARAM_RED, 0, 0);
+}
+
+int mt7915_mcu_init(struct mt7915_dev *dev)
+{
+	static const struct mt76_mcu_ops mt7915_mcu_ops = {
+		.headroom = sizeof(struct mt76_connac2_mcu_txd),
+		.mcu_skb_send_msg = mt7915_mcu_send_message,
+		.mcu_parse_response = mt7915_mcu_parse_response,
+		.mcu_restart = mt76_connac_mcu_restart,
+	};
+
+	dev->mt76.mcu_ops = &mt7915_mcu_ops;
+
+	return mt7915_run_firmware(dev);
 }
 
 void mt7915_mcu_exit(struct mt7915_dev *dev)

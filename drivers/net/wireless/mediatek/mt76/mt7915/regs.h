@@ -32,6 +32,9 @@ enum reg_rev {
 	INFRA_MCU_ADDR_END,
 	FW_EXCEPTION_ADDR,
 	SWDEF_BASE_ADDR,
+	TXQ_WED_RING_BASE,
+	RXQ_WED_RING_BASE,
+	EXCEPTION_BASE_ADDR,
 	__MT_REG_MAX,
 };
 
@@ -123,6 +126,11 @@ enum offs_rev {
 
 #define __REG(id)			(dev->reg.reg_rev[(id)])
 #define __OFFS(id)			(dev->reg.offs_rev[(id)])
+
+/* MEM WFDMA */
+#define WF_WFDMA_MEM_DMA		0x58000000
+
+#define WF_WFDMA_MEM_DMA_RX_RING_CTL	(WF_WFDMA_MEM_DMA + (0x510))
 
 /* MCU WFDMA0 */
 #define MT_MCU_WFDMA0_BASE		0x2000
@@ -610,6 +618,10 @@ enum offs_rev {
 #define MT_WFDMA0_PRI_DLY_INT_CFG1	MT_WFDMA0(0x2f4)
 #define MT_WFDMA0_PRI_DLY_INT_CFG2	MT_WFDMA0(0x2f8)
 
+#define MT_WFDMA0_MCU_HOST_INT_ENA	MT_WFDMA0(0x1f4)
+#define MT_WFDMA0_MT_WA_WDT_INT		BIT(31)
+#define MT_WFDMA0_MT_WM_WDT_INT		BIT(30)
+
 /* WFDMA1 */
 #define MT_WFDMA1_BASE			0xd5000
 #define MT_WFDMA1(ofs)			(MT_WFDMA1_BASE + (ofs))
@@ -754,6 +766,10 @@ enum offs_rev {
 #define MT_MCU_CMD_RECOVERY_DONE	BIT(4)
 #define MT_MCU_CMD_NORMAL_STATE		BIT(5)
 #define MT_MCU_CMD_ERROR_MASK		GENMASK(5, 1)
+
+#define MT_MCU_CMD_WA_WDT		BIT(31)
+#define MT_MCU_CMD_WM_WDT		BIT(30)
+#define MT_MCU_CMD_WDT_MASK		GENMASK(31, 30)
 
 /* TOP RGU */
 #define MT_TOP_RGU_BASE			0x18000000
@@ -1029,6 +1045,8 @@ enum offs_rev {
 #define MT_CPU_UTIL_IDLE_CNT		MT_CPU_UTIL(0x08)
 #define MT_CPU_UTIL_PEAK_IDLE_CNT	MT_CPU_UTIL(0x0c)
 #define MT_CPU_UTIL_CTRL		MT_CPU_UTIL(0x1c)
+
+#define MT_EXCEPTION_ADDR		__REG(EXCEPTION_BASE_ADDR)
 
 /* LED */
 #define MT_LED_TOP_BASE			0x18013000

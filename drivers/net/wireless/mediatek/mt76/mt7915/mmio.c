@@ -24,6 +24,9 @@ static const u32 mt7915_reg[] = {
 	[INFRA_MCU_ADDR_END]	= 0x7c3fffff,
 	[FW_EXCEPTION_ADDR]	= 0x219848,
 	[SWDEF_BASE_ADDR]	= 0x41f200,
+	[TXQ_WED_RING_BASE]	= 0xd7300,
+	[RXQ_WED_RING_BASE]	= 0xd7410,
+	[EXCEPTION_BASE_ADDR]	= 0x219848,
 };
 
 static const u32 mt7916_reg[] = {
@@ -40,6 +43,9 @@ static const u32 mt7916_reg[] = {
 	[INFRA_MCU_ADDR_END]	= 0x7c085fff,
 	[FW_EXCEPTION_ADDR]	= 0x022050bc,
 	[SWDEF_BASE_ADDR]	= 0x411400,
+	[TXQ_WED_RING_BASE]	= 0xd7300,
+	[RXQ_WED_RING_BASE]	= 0xd7410,
+	[EXCEPTION_BASE_ADDR]	= 0x022050BC,
 };
 
 static const u32 mt7986_reg[] = {
@@ -56,6 +62,9 @@ static const u32 mt7986_reg[] = {
 	[INFRA_MCU_ADDR_END]	= 0x7c085fff,
 	[FW_EXCEPTION_ADDR]	= 0x02204ffc,
 	[SWDEF_BASE_ADDR]	= 0x411400,
+	[TXQ_WED_RING_BASE]	= 0x24420,
+	[RXQ_WED_RING_BASE]	= 0x24520,
+	[EXCEPTION_BASE_ADDR]	= 0x02204FFC,
 };
 
 static const u32 mt7915_offs[] = {
@@ -623,10 +632,9 @@ static void mt7915_irq_tasklet(struct tasklet_struct *t)
 		u32 val = mt76_rr(dev, MT_MCU_CMD);
 
 		mt76_wr(dev, MT_MCU_CMD, val);
-		if (val & MT_MCU_CMD_ERROR_MASK) {
+		if (val & (MT_MCU_CMD_ERROR_MASK | MT_MCU_CMD_WDT_MASK)) {
 			dev->reset_state = val;
-			queue_work(dev->mt76.wq, &dev->reset_work);
-			wake_up(&dev->reset_wait);
+			mt7915_reset(dev);
 		}
 	}
 }
