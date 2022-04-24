@@ -719,6 +719,7 @@ int mt7915_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 	struct mt7915_phy *phy;
 #endif
 	int ret, idx;
+	u32 addr;
 
 	idx = mt76_wcid_alloc(dev->mt76.wcid_mask, MT7915_WTBL_STA);
 	if (idx < 0)
@@ -739,6 +740,9 @@ int mt7915_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 	ret = mt7915_mcu_add_sta(dev, vif, sta, true);
 	if (ret)
 		return ret;
+
+	addr = mt7915_mac_wtbl_lmac_addr(dev, msta->wcid.idx, 30);
+	mt76_rmw_field(dev, addr, GENMASK(7, 0), 0xa0);
 
 #ifdef CONFIG_MTK_VENDOR
 	mt7915_vendor_amnt_sta_remove(mvif->phy, sta);
