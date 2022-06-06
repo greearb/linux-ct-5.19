@@ -340,6 +340,20 @@ struct mt7915_phy {
 		u8 spe_idx;
 	} test;
 #endif
+
+#ifdef CONFIG_MTK_VENDOR
+	struct {
+		struct list_head csi_list;
+		spinlock_t csi_lock;
+		u32 count;
+		bool mask;
+		bool reorder;
+		bool enable;
+
+		u32 interval;
+		u32 last_record;
+	} csi;
+#endif
 };
 
 struct mt7915_dev {
@@ -711,6 +725,12 @@ int mt7915_dfs_stop_radar_detector(struct mt7915_phy *phy, bool ext_phy);
 #ifdef CONFIG_MAC80211_DEBUGFS
 void mt7915_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			    struct ieee80211_sta *sta, struct dentry *dir);
+#endif
+
+#ifdef CONFIG_MTK_VENDOR
+void mt7915_vendor_register(struct mt7915_phy *phy);
+int mt7915_mcu_set_csi(struct mt7915_phy *phy, u8 mode,
+			u8 cfg, u8 v1, u32 v2, u8 *mac_addr);
 #endif
 
 #ifdef MTK_DEBUG

@@ -488,4 +488,80 @@ enum {
 					 sizeof(struct bss_info_bcn_cont) + \
 					 sizeof(struct bss_info_inband_discovery))
 
+#ifdef CONFIG_MTK_VENDOR
+struct mt7915_mcu_csi {
+	u8 band;
+	u8 mode;
+	u8 cfg;
+	u8 v1;
+	__le32 v2;
+	u8 mac_addr[ETH_ALEN];
+	u8 _rsv[34];
+} __packed;
+
+struct csi_tlv {
+	__le32 tag;
+	__le32 len;
+} __packed;
+
+#define CSI_MAX_COUNT	256
+#define CSI_MAX_BUF_NUM	3000
+
+struct mt7915_mcu_csi_report {
+	struct csi_tlv _t0;
+	__le32 ver;
+	struct csi_tlv _t1;
+	__le32 ch_bw;
+	struct csi_tlv _t2;
+	__le32 rssi;
+	struct csi_tlv _t3;
+	__le32 snr;
+	struct csi_tlv _t4;
+	__le32 band;
+	struct csi_tlv _t5;
+	__le32 data_num;
+	struct csi_tlv _t6;
+	__le16 data_i[CSI_MAX_COUNT];
+	struct csi_tlv _t7;
+	__le16 data_q[CSI_MAX_COUNT];
+	struct csi_tlv _t8;
+	__le32 data_bw;
+	struct csi_tlv _t9;
+	__le32 pri_ch_idx;
+	struct csi_tlv _t10;
+	u8 ta[8];
+	struct csi_tlv _t11;
+	__le32 info;
+	struct csi_tlv _t12;
+	__le32 rx_mode;
+	struct csi_tlv _t17;
+	__le32 h_idx;
+	struct csi_tlv _t18;
+	__le32 trx_idx;
+	struct csi_tlv _t19;
+	__le32 ts;
+} __packed;
+
+struct csi_data {
+	u8 ch_bw;
+	u16 data_num;
+	s16 data_i[CSI_MAX_COUNT];
+	s16 data_q[CSI_MAX_COUNT];
+	u8 band;
+	s8 rssi;
+	u8 snr;
+	u32 ts;
+	u8 data_bw;
+	u8 pri_ch_idx;
+	u8 ta[ETH_ALEN];
+	u32 info;
+	u8 rx_mode;
+	u32 h_idx;
+	u16 tx_idx;
+	u16 rx_idx;
+
+	struct list_head node;
+};
+#endif
+
 #endif

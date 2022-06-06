@@ -37,6 +37,10 @@ MODULE_PARM_DESC(fw_debug,
 #define HE_PHY(p, c)			u8_get_bits(c, IEEE80211_HE_PHY_##p)
 #define HE_MAC(m, c)			u8_get_bits(c, IEEE80211_HE_MAC_##m)
 
+#ifdef CONFIG_MTK_VENDOR
+static int mt7915_mcu_report_csi(struct mt7915_dev *dev, struct sk_buff *skb);
+#endif
+
 static u8
 mt7915_mcu_get_sta_nss(u16 mcs_map)
 {
@@ -463,6 +467,11 @@ mt7915_mcu_rx_ext_event(struct mt7915_dev *dev, struct sk_buff *skb)
 	case MCU_EXT_EVENT_FW_LOG_2_HOST:
 		mt7915_mcu_rx_log_message(dev, skb);
 		break;
+#ifdef CONFIG_MTK_VENDOR
+	case MCU_EXT_EVENT_CSI_REPORT:
+		mt7915_mcu_report_csi(dev, skb);
+		break;
+#endif
 	case MCU_EXT_EVENT_BCC_NOTIFY:
 		mt7915_mcu_rx_bcc_notify(dev, skb);
 		break;
@@ -3652,6 +3661,108 @@ int mt7915_mcu_twt_agrt_update(struct mt7915_dev *dev,
 	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(TWT_AGRT_UPDATE),
 				 &req, sizeof(req), true);
 }
+
+#ifdef CONFIG_MTK_VENDOR
+int mt7915_mcu_set_csi(struct mt7915_phy *phy, u8 mode,
+			u8 cfg, u8 v1, u32 v2, u8 *mac_addr)
+{
+	struct mt7915_dev *dev = phy->dev;
+	struct mt7915_mcu_csi req = {
+		.band = phy != &dev->phy,
+		.mode = mode,
+		.cfg = cfg,
+		.v1 = v1,
+		.v2 = cpu_to_le32(v2),
+	};
+
+	if (is_valid_ether_addr(mac_addr))
+		ether_addr_copy(req.mac_addr, mac_addr);
+
+	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(CSI_CTRL), &req,
+				 sizeof(req), false);
+}
+
+static int
+mt7915_mcu_report_csi(struct mt7915_dev *dev, struct sk_buff *skb)
+{
+	struct mt76_connac2_mcu_rxd *rxd = (struct mt76_connac2_mcu_rxd *)skb->data;
+	struct mt7915_phy *phy = &dev->phy;
+	struct mt7915_mcu_csi_report *cr;
+	struct csi_data *csi;
+	int len, i;
+
+	skb_pull(skb, sizeof(struct mt76_connac2_mcu_rxd));
+
+	len = le16_to_cpu(rxd->len) - sizeof(struct mt76_connac2_mcu_rxd) + 24;
+	if (len < sizeof(*cr))
+		return -EINVAL;
+
+	cr = (struct mt7915_mcu_csi_report *)skb->data;
+
+	if (phy->csi.interval &&
+	    le32_to_cpu(cr->ts) < phy->csi.last_record + phy->csi.interval)
+		return 0;
+
+	csi = kzalloc(sizeof(*csi), GFP_KERNEL);
+	if (!csi)
+		return -ENOMEM;
+
+#define SET_CSI_DATA(_field)	csi->_field = le32_to_cpu(cr->_field)
+	SET_CSI_DATA(ch_bw);
+	SET_CSI_DATA(rssi);
+	SET_CSI_DATA(snr);
+	SET_CSI_DATA(data_num);
+	SET_CSI_DATA(data_bw);
+	SET_CSI_DATA(pri_ch_idx);
+	SET_CSI_DATA(info);
+	SET_CSI_DATA(rx_mode);
+	SET_CSI_DATA(h_idx);
+	SET_CSI_DATA(ts);
+
+	SET_CSI_DATA(band);
+	if (csi->band && !phy->band_idx)
+		phy = mt7915_ext_phy(dev);
+#undef SET_CSI_DATA
+
+	for (i = 0; i < csi->data_num; i++) {
+		csi->data_i[i] = le16_to_cpu(cr->data_i[i]);
+		csi->data_q[i] = le16_to_cpu(cr->data_q[i]);
+	}
+
+	memcpy(csi->ta, cr->ta, ETH_ALEN);
+	csi->tx_idx = le32_get_bits(cr->trx_idx, GENMASK(31, 16));
+	csi->rx_idx = le32_get_bits(cr->trx_idx, GENMASK(15, 0));
+
+	INIT_LIST_HEAD(&csi->node);
+	spin_lock_bh(&phy->csi.csi_lock);
+
+	if (!phy->csi.enable) {
+		kfree(csi);
+		spin_unlock_bh(&phy->csi.csi_lock);
+		return 0;
+	}
+
+	list_add_tail(&csi->node, &phy->csi.csi_list);
+	phy->csi.count++;
+
+	if (phy->csi.count > CSI_MAX_BUF_NUM) {
+		struct csi_data *old;
+
+		old = list_first_entry(&phy->csi.csi_list,
+				       struct csi_data, node);
+
+		list_del(&old->node);
+		kfree(old);
+		phy->csi.count--;
+	}
+
+	if (csi->h_idx & BIT(15)) /* last chain */
+		phy->csi.last_record = csi->ts;
+	spin_unlock_bh(&phy->csi.csi_lock);
+
+	return 0;
+}
+#endif
 
 #ifdef MTK_DEBUG
 int mt7915_dbg_mcu_wa_cmd(struct mt7915_dev *dev, int cmd, u32 a1, u32 a2, u32 a3, bool wait_resp)
