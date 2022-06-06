@@ -22,6 +22,29 @@ csi_ctrl_policy[NUM_MTK_VENDOR_ATTRS_CSI_CTRL] = {
 	[MTK_VENDOR_ATTR_CSI_CTRL_DATA] = { .type = NLA_NESTED },
 };
 
+static const struct nla_policy
+wireless_ctrl_policy[NUM_MTK_VENDOR_ATTRS_WIRELESS_CTRL] = {
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_MCS] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_OFDMA] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_PPDU_TX_TYPE] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_NUSERS_OFDMA] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_MIMO] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_BA_BUFFER_SIZE] = {.type = NLA_U16 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_MU_EDCA] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_CERT] = {.type = NLA_U8 },
+};
+
+static const struct nla_policy
+rfeature_ctrl_policy[NUM_MTK_VENDOR_ATTRS_RFEATURE_CTRL] = {
+	[MTK_VENDOR_ATTR_RFEATURE_CTRL_HE_GI] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_RFEATURE_CTRL_HE_LTF] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TYPE_CFG] = { .type = NLA_NESTED },
+	[MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TYPE_EN] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TYPE] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_RFEATURE_CTRL_ACK_PLCY] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TXBF] = { .type = NLA_U8 },
+};
+
 struct csi_null_tone {
 	u8 start;
 	u8 end;
@@ -777,6 +800,148 @@ mt7915_vendor_amnt_ctrl_dump(struct wiphy *wiphy, struct wireless_dev *wdev,
 	return len + 1;
 }
 
+static int mt7915_vendor_rfeature_ctrl(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  const void *data,
+				  int data_len)
+{
+	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
+	struct mt7915_phy *phy = mt7915_hw_phy(hw);
+	struct mt7915_dev *dev = phy->dev;
+	struct nlattr *tb[NUM_MTK_VENDOR_ATTRS_RFEATURE_CTRL];
+	int err;
+	u32 val;
+
+	err = nla_parse(tb, MTK_VENDOR_ATTR_RFEATURE_CTRL_MAX, data, data_len,
+			rfeature_ctrl_policy, NULL);
+	if (err)
+		return err;
+
+	val = CAPI_RFEATURE_CHANGED;
+
+	if (tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_HE_GI]) {
+		val |= FIELD_PREP(RATE_CFG_MODE, RATE_PARAM_FIXED_GI)|
+			FIELD_PREP(RATE_CFG_VAL, nla_get_u8(tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_HE_GI]));
+		ieee80211_iterate_stations_atomic(hw, mt7915_capi_sta_rc_work, &val);
+		ieee80211_queue_work(hw, &dev->rc_work);
+	}
+	else if (tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_HE_LTF]) {
+		val |= FIELD_PREP(RATE_CFG_MODE, RATE_PARAM_FIXED_HE_LTF)|
+			FIELD_PREP(RATE_CFG_VAL, nla_get_u8(tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_HE_LTF]));
+                ieee80211_iterate_stations_atomic(hw, mt7915_capi_sta_rc_work, &val);
+		ieee80211_queue_work(hw, &dev->rc_work);
+	}
+	else if (tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TYPE_CFG]) {
+		u8 enable, trig_type;
+		int rem;
+		struct nlattr *cur;
+
+		nla_for_each_nested(cur, tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TYPE_CFG], rem) {
+			switch(nla_type(cur)) {
+			case MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TYPE_EN:
+				enable = nla_get_u8(cur);
+				break;
+			case MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TYPE:
+				trig_type = nla_get_u8(cur);
+				break;
+			default:
+				return -EINVAL;
+			};
+		}
+
+		err = mt7915_mcu_set_rfeature_trig_type(phy, enable, trig_type);
+		if (err)
+			return err;
+	}
+	else if (tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_ACK_PLCY]) {
+		u8 ack_policy;
+
+		ack_policy = nla_get_u8(tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_ACK_PLCY]);
+#define HE_TB_PPDU_ACK 4
+		switch (ack_policy) {
+		case HE_TB_PPDU_ACK:
+			return mt7915_mcu_set_mu_dl_ack_policy(phy, ack_policy);
+		default:
+			return 0;
+		}
+	}
+	else if (tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TXBF]) {
+		u8 trig_txbf;
+
+		trig_txbf = nla_get_u8(tb[MTK_VENDOR_ATTR_RFEATURE_CTRL_TRIG_TXBF]);
+		/* CAPI only issues trig_txbf=disable */
+	}
+
+	return 0;
+}
+
+static int mt7915_vendor_wireless_ctrl(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  const void *data,
+				  int data_len)
+{
+	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
+	struct mt7915_phy *phy = mt7915_hw_phy(hw);
+	struct mt7915_dev *dev = phy->dev;
+	struct nlattr *tb[NUM_MTK_VENDOR_ATTRS_WIRELESS_CTRL];
+	int err;
+	u8 val8;
+	u16 val16;
+	u32 val32;
+
+	err = nla_parse(tb, MTK_VENDOR_ATTR_WIRELESS_CTRL_MAX, data, data_len,
+			wireless_ctrl_policy, NULL);
+	if (err)
+		return err;
+
+	val32 = CAPI_WIRELESS_CHANGED;
+
+	if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_MCS]) {
+		val32 &= ~CAPI_WIRELESS_CHANGED;
+		val32 |= CAPI_RFEATURE_CHANGED |
+			FIELD_PREP(RATE_CFG_MODE, RATE_PARAM_FIXED_MCS) |
+			FIELD_PREP(RATE_CFG_VAL, nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_MCS]));
+		ieee80211_iterate_stations_atomic(hw, mt7915_capi_sta_rc_work, &val32);
+		ieee80211_queue_work(hw, &dev->rc_work);
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_OFDMA]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_OFDMA]);
+		val32 |= FIELD_PREP(RATE_CFG_MODE, RATE_PARAM_FIXED_OFDMA) |
+			 FIELD_PREP(RATE_CFG_VAL, val8);
+		ieee80211_iterate_active_interfaces_atomic(hw, IEEE80211_IFACE_ITER_RESUME_ALL,
+			mt7915_set_wireless_vif, &val32);
+		if (val8 == 3) /* DL20and80 */
+			mt7915_mcu_set_dynalgo(phy, 1); /* Enable dynamic algo */
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_BA_BUFFER_SIZE]) {
+		val16 = nla_get_u16(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_BA_BUFFER_SIZE]);
+		hw->max_tx_aggregation_subframes = val16;
+		hw->max_rx_aggregation_subframes = val16;
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_MU_EDCA]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_MU_EDCA]);
+		mt7915_mcu_set_mu_edca(phy, val8);
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_PPDU_TX_TYPE]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_PPDU_TX_TYPE]);
+		mt7915_mcu_set_ppdu_tx_type(phy, val8);
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_NUSERS_OFDMA]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_NUSERS_OFDMA]);
+		if (FIELD_GET(OFDMA_UL, dev->dbg.muru_onoff) == 1)
+			mt7915_mcu_set_nusers_ofdma(phy, MURU_UL_USER_CNT, val8);
+		else
+			mt7915_mcu_set_nusers_ofdma(phy, MURU_DL_USER_CNT, val8);
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_MIMO]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_MIMO]);
+		val32 |= FIELD_PREP(RATE_CFG_MODE, RATE_PARAM_FIXED_MIMO) |
+			 FIELD_PREP(RATE_CFG_VAL, val8);
+		ieee80211_iterate_active_interfaces_atomic(hw, IEEE80211_IFACE_ITER_RESUME_ALL,
+			mt7915_set_wireless_vif, &val32);
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_CERT]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_CERT]);
+		mt7915_mcu_set_cert(phy, val8); /* Cert Enable for OMI */
+		mt7915_mcu_set_bypass_smthint(phy, val8); /* Cert bypass smooth interpolation */
+	}
+
+	return 0;
+}
+
 static const struct wiphy_vendor_command mt7915_vendor_commands[] = {
 	{
 		.info = {
@@ -801,6 +966,28 @@ static const struct wiphy_vendor_command mt7915_vendor_commands[] = {
 		.dumpit = mt7915_vendor_amnt_ctrl_dump,
 		.policy = amnt_ctrl_policy,
 		.maxattr = MTK_VENDOR_ATTR_AMNT_CTRL_MAX,
+	},
+	{
+		.info = {
+			.vendor_id = MTK_NL80211_VENDOR_ID,
+			.subcmd = MTK_NL80211_VENDOR_SUBCMD_RFEATURE_CTRL,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = mt7915_vendor_rfeature_ctrl,
+		.policy = rfeature_ctrl_policy,
+		.maxattr = MTK_VENDOR_ATTR_RFEATURE_CTRL_MAX,
+	},
+	{
+		.info = {
+			.vendor_id = MTK_NL80211_VENDOR_ID,
+			.subcmd = MTK_NL80211_VENDOR_SUBCMD_WIRELESS_CTRL,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = mt7915_vendor_wireless_ctrl,
+		.policy = wireless_ctrl_policy,
+		.maxattr = MTK_VENDOR_ATTR_WIRELESS_CTRL_MAX,
 	}
 };
 

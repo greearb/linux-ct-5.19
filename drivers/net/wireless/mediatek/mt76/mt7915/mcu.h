@@ -396,9 +396,14 @@ enum {
 	RATE_PARAM_FIXED = 3,
 	RATE_PARAM_MMPS_UPDATE = 5,
 	RATE_PARAM_FIXED_HE_LTF = 7,
-	RATE_PARAM_FIXED_MCS,
+	RATE_PARAM_FIXED_MCS = 8,
 	RATE_PARAM_FIXED_GI = 11,
 	RATE_PARAM_AUTO = 20,
+	RATE_PARAM_SPE_UPDATE = 22,
+#ifdef CONFIG_MTK_VENDOR
+	RATE_PARAM_FIXED_MIMO = 30,
+	RATE_PARAM_FIXED_OFDMA = 31,
+#endif
 };
 
 #define RATE_CFG_MCS			GENMASK(3, 0)
@@ -409,6 +414,9 @@ enum {
 #define RATE_CFG_LDPC			GENMASK(23, 20)
 #define RATE_CFG_PHY_TYPE		GENMASK(27, 24)
 #define RATE_CFG_HE_LTF			GENMASK(31, 28)
+
+#define RATE_CFG_MODE			GENMASK(15, 8)
+#define RATE_CFG_VAL			GENMASK(7, 0)
 
 enum {
 	THERMAL_PROTECT_PARAMETER_CTRL,
@@ -569,5 +577,203 @@ struct csi_data {
 #define OFDMA_UL                       BIT(1)
 #define MUMIMO_DL                      BIT(2)
 #define MUMIMO_UL                      BIT(3)
+#define MUMIMO_DL_CERT                 BIT(4)
+
+#ifdef CONFIG_MTK_VENDOR
+struct mt7915_muru_comm {
+   u8 ppdu_format;
+   u8 sch_type;
+   u8 band;
+   u8 wmm_idx;
+   u8 spe_idx;
+   u8 proc_type;
+};
+
+struct mt7915_muru_dl {
+   u8 user_num;
+   u8 tx_mode;
+   u8 bw;
+   u8 gi;
+   u8 ltf;
+   /* sigB */
+   u8 mcs;
+   u8 dcm;
+   u8 cmprs;
+
+   u8 ru[8];
+   u8 c26[2];
+   u8 ack_policy;
+
+   struct {
+	   __le16 wlan_idx;
+       u8 ru_alloc_seg;
+       u8 ru_idx;
+       u8 ldpc;
+       u8 nss;
+       u8 mcs;
+       u8 mu_group_idx;
+       u8 vht_groud_id;
+       u8 vht_up;
+       u8 he_start_stream;
+       u8 he_mu_spatial;
+       u8 ack_policy;
+       __le16 tx_power_alpha;
+   } usr[16];
+};
+
+struct mt7915_muru_ul {
+   u8 user_num;
+
+   /* UL TX */
+   u8 trig_type;
+   __le16 trig_cnt;
+   __le16 trig_intv;
+   u8 bw;
+   u8 gi_ltf;
+   __le16 ul_len;
+   u8 pad;
+   u8 trig_ta[ETH_ALEN];
+   u8 ru[8];
+   u8 c26[2];
+
+   struct {
+       __le16 wlan_idx;
+       u8 ru_alloc;
+       u8 ru_idx;
+       u8 ldpc;
+       u8 nss;
+       u8 mcs;
+       u8 target_rssi;
+       __le32 trig_pkt_size;
+   } usr[16];
+
+   /* HE TB RX Debug */
+   __le32 rx_hetb_nonsf_en_bitmap;
+   __le32 rx_hetb_cfg[2];
+
+   /* DL TX */
+   u8 ba_type;
+};
+
+struct mt7915_muru {
+   __le32 cfg_comm;
+   __le32 cfg_dl;
+   __le32 cfg_ul;
+
+   struct mt7915_muru_comm comm;
+   struct mt7915_muru_dl dl;
+   struct mt7915_muru_ul ul;
+};
+
+#define MURU_PPDU_HE_TRIG      BIT(2)
+#define MURU_PPDU_HE_MU                 BIT(3)
+
+#define MURU_OFDMA_SCH_TYPE_DL          BIT(0)
+#define MURU_OFDMA_SCH_TYPE_UL          BIT(1)
+
+/* Common Config */
+#define MURU_COMM_PPDU_FMT              BIT(0)
+#define MURU_COMM_SCH_TYPE              BIT(1)
+#define MURU_COMM_SET                   (MURU_COMM_PPDU_FMT | MURU_COMM_SCH_TYPE)
+/* DL&UL User config*/
+#define MURU_USER_CNT                   BIT(4)
+
+enum {
+   CAPI_SU,
+   CAPI_MU,
+   CAPI_ER_SU,
+   CAPI_TB,
+   CAPI_LEGACY
+};
+
+enum {
+   CAPI_BASIC,
+   CAPI_BRP,
+   CAPI_MU_BAR,
+   CAPI_MU_RTS,
+   CAPI_BSRP,
+   CAPI_GCR_MU_BAR,
+   CAPI_BQRP,
+   CAPI_NDP_FRP
+};
+
+enum {
+   MURU_SET_BSRP_CTRL = 1,
+   MURU_SET_SUTX = 16,
+   MURU_SET_MUMIMO_CTRL = 17,
+   MURU_SET_MANUAL_CFG = 100,
+   MURU_SET_MU_DL_ACK_POLICY = 200,
+   MURU_SET_TRIG_TYPE = 201,
+   MURU_SET_20M_DYN_ALGO = 202,
+   MURU_SET_PROT_FRAME_THR = 204,
+   MURU_SET_CERT_MU_EDCA_OVERRIDE = 205,
+};
+
+enum {
+   MU_DL_ACK_POLICY_MU_BAR = 3,
+   MU_DL_ACK_POLICY_TF_FOR_ACK = 4,
+  MU_DL_ACK_POLICY_SU_BAR = 5,
+};
+
+enum {
+   BF_SOUNDING_OFF = 0,
+   BF_SOUNDING_ON,
+   BF_DATA_PACKET_APPLY,
+   BF_PFMU_MEM_ALLOCATE,
+   BF_PFMU_MEM_RELEASE,
+   BF_PFMU_TAG_READ,
+   BF_PFMU_TAG_WRITE,
+   BF_PROFILE_READ,
+   BF_PROFILE_WRITE,
+   BF_PN_READ,
+   BF_PN_WRITE,
+   BF_PFMU_MEM_ALLOC_MAP_READ,
+   BF_AID_SET,
+   BF_STA_REC_READ,
+   BF_PHASE_CALIBRATION,
+   BF_IBF_PHASE_COMP,
+   BF_LNA_GAIN_CONFIG,
+   BF_PROFILE_WRITE_20M_ALL,
+   BF_APCLIENT_CLUSTER,
+   BF_AWARE_CTRL,
+   BF_HW_ENABLE_STATUS_UPDATE,
+   BF_REPT_CLONED_STA_TO_NORMAL_STA,
+   BF_GET_QD,
+   BF_BFEE_HW_CTRL,
+   BF_PFMU_SW_TAG_WRITE,
+   BF_MOD_EN_CTRL,
+   BF_DYNSND_EN_INTR,
+   BF_DYNSND_CFG_DMCS_TH,
+   BF_DYNSND_EN_PFID_INTR,
+   BF_CONFIG,
+   BF_PFMU_DATA_WRITE,
+   BF_FBRPT_DBG_INFO_READ,
+   BF_CMD_TXSND_INFO,
+   BF_CMD_PLY_INFO,
+   BF_CMD_MU_METRIC,
+   BF_CMD_TXCMD,
+   BF_CMD_CFG_PHY,
+   BF_CMD_SND_CNT,
+   BF_CMD_MAX
+};
+
+enum {
+   BF_SND_READ_INFO = 0,
+   BF_SND_CFG_OPT,
+   BF_SND_CFG_INTV,
+   BF_SND_STA_STOP,
+   BF_SND_CFG_MAX_STA,
+   BF_SND_CFG_BFRP,
+   BF_SND_CFG_INF
+};
+
+enum {
+   MURU_UPDATE = 0,
+   MURU_DL_USER_CNT,
+   MURU_UL_USER_CNT,
+   MURU_DL_INIT,
+   MURU_UL_INIT,
+};
+#endif
 
 #endif

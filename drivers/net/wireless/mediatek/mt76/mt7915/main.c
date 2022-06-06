@@ -715,6 +715,9 @@ int mt7915_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
 	struct mt7915_vif *mvif = (struct mt7915_vif *)vif->drv_priv;
 	bool ext_phy = mvif->phy != &dev->phy;
+#ifdef CONFIG_MTK_VENDOR
+	struct mt7915_phy *phy;
+#endif
 	int ret, idx;
 
 	idx = mt76_wcid_alloc(dev->mt76.wcid_mask, MT7915_WTBL_STA);
@@ -740,7 +743,17 @@ int mt7915_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 #ifdef CONFIG_MTK_VENDOR
 	mt7915_vendor_amnt_sta_remove(mvif->phy, sta);
 #endif
-	return mt7915_mcu_add_rate_ctrl(dev, vif, sta, false);
+	ret = mt7915_mcu_add_rate_ctrl(dev, vif, sta, false);
+	if (ret)
+		return ret;
+
+#ifdef CONFIG_MTK_VENDOR
+	if (dev->dbg.muru_onoff & MUMIMO_DL_CERT) {
+		phy = mvif->mt76.band_idx ? mt7915_ext_phy(dev) : &dev->phy;
+		mt7915_mcu_set_mimo(phy, 0);
+	}
+#endif
+	return 0;
 }
 
 void mt7915_mac_sta_remove(struct mt76_dev *mdev, struct ieee80211_vif *vif,

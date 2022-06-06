@@ -759,6 +759,19 @@ void mt7915_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 #endif
 
 #ifdef CONFIG_MTK_VENDOR
+void mt7915_capi_sta_rc_work(void *data, struct ieee80211_sta *sta);
+void mt7915_set_wireless_vif(void *data, u8 *mac, struct ieee80211_vif *vif);
+void mt7915_mcu_set_rfeature_starec(void *data, struct mt7915_dev *dev,
+		       struct ieee80211_vif *vif, struct ieee80211_sta *sta);
+int mt7915_mcu_set_rfeature_trig_type(struct mt7915_phy *phy, u8 enable, u8 trig_type);
+int mt7915_mcu_set_mu_dl_ack_policy(struct mt7915_phy *phy, u8 policy_num);
+void mt7915_mcu_set_ppdu_tx_type(struct mt7915_phy *phy, u8 ppdu_type);
+void mt7915_mcu_set_nusers_ofdma(struct mt7915_phy *phy, u8 type, u8 ofdma_user_cnt);
+void mt7915_mcu_set_mimo(struct mt7915_phy *phy, u8 direction);
+void mt7915_mcu_set_dynalgo(struct mt7915_phy *phy, u8 enable);
+int mt7915_mcu_set_mu_edca(struct mt7915_phy *phy, u8 val);
+void mt7915_mcu_set_cert(struct mt7915_phy *phy, u8 type);
+void mt7915_mcu_set_bypass_smthint(struct mt7915_phy *phy, u8 val);
 void mt7915_vendor_register(struct mt7915_phy *phy);
 int mt7915_mcu_set_csi(struct mt7915_phy *phy, u8 mode,
 			u8 cfg, u8 v1, u32 v2, u8 *mac_addr);

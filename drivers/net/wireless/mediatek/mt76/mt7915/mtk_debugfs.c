@@ -2486,7 +2486,8 @@ static int mt7915_muru_onoff_get(void *data, u64 *val)
 
        *val = dev->dbg.muru_onoff;
 
-       printk("mumimo ul:%d, mumimo dl:%d, ofdma ul:%d, ofdma dl:%d\n",
+	   printk("cert mumimo dl:%d, mumimo ul:%d, mumimo dl:%d, ofdma ul:%d, ofdma dl:%d\n",
+               !!(dev->dbg.muru_onoff & MUMIMO_DL_CERT),
                !!(dev->dbg.muru_onoff & MUMIMO_UL),
                !!(dev->dbg.muru_onoff & MUMIMO_DL),
                !!(dev->dbg.muru_onoff & OFDMA_UL),
@@ -2499,8 +2500,8 @@ static int mt7915_muru_onoff_set(void *data, u64 val)
 {
        struct mt7915_dev *dev = data;
 
-       if (val > 15) {
-               printk("Wrong value! The value is between 0 ~ 15.\n");
+       if (val > 31) {
+               printk("Wrong value! The value is between 0 ~ 31.\n");
                goto exit;
        }
 
