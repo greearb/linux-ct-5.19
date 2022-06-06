@@ -39,6 +39,7 @@ enum reg_rev {
 };
 
 enum offs_rev {
+	TMAC_TCR2,
 	TMAC_CDTR,
 	TMAC_ODTR,
 	TMAC_ATCR,
@@ -209,6 +210,12 @@ enum offs_rev {
 #define MT_TRB_RXPSR0_RX_WTBL_PTR	GENMASK(25, 16)
 #define MT_TRB_RXPSR0_RX_RMAC_PTR	GENMASK(9, 0)
 
+#define MT_MDP_TOP_DBG_WDT_CTRL			MT_MDP(0x0d0)
+#define MT_MDP_TOP_DBG_WDT_CTRL_TDP_DIS_BLK	BIT(7)
+
+#define MT_MDP_TOP_DBG_CTRL			MT_MDP(0x0dc)
+#define MT_MDP_TOP_DBG_CTRL_ENQ_MODE		BIT(30)
+
 /* TMAC: band 0(0x820e4000), band 1(0x820f4000) */
 #define MT_WF_TMAC_BASE(_band)		((_band) ? 0x820f4000 : 0x820e4000)
 #define MT_WF_TMAC(_band, ofs)		(MT_WF_TMAC_BASE(_band) + (ofs))
@@ -216,6 +223,9 @@ enum offs_rev {
 #define MT_TMAC_TCR0(_band)		MT_WF_TMAC(_band, 0)
 #define MT_TMAC_TCR0_TX_BLINK		GENMASK(7, 6)
 #define MT_TMAC_TCR0_TBTT_STOP_CTRL	BIT(25)
+
+#define MT_TMAC_TCR2(_band)		MT_WF_TMAC(_band, __OFFS(TMAC_TCR2))
+#define MT_TMAC_TCR2_SCH_DET_DIS	BIT(19)
 
 #define MT_TMAC_CDTR(_band)		MT_WF_TMAC(_band, __OFFS(TMAC_CDTR))
  #define MT_TMAC_ODTR(_band)		MT_WF_TMAC(_band, __OFFS(TMAC_ODTR))
@@ -529,8 +539,10 @@ enum offs_rev {
 #define MT_AGG_PCR0_VHT_PROT		BIT(13)
 #define MT_AGG_PCR0_PTA_WIN_DIS		BIT(15)
 
-#define MT_AGG_PCR1_RTS0_NUM_THRES	GENMASK(31, 23)
-#define MT_AGG_PCR1_RTS0_LEN_THRES	GENMASK(19, 0)
+#define MT_AGG_PCR1_RTS0_NUM_THRES		GENMASK(31, 23)
+#define MT_AGG_PCR1_RTS0_LEN_THRES		GENMASK(19, 0)
+#define MT_AGG_PCR1_RTS0_NUM_THRES_MT7916	GENMASK(29, 24)
+#define MT_AGG_PCR1_RTS0_LEN_THRES_MT7916	GENMASK(22, 0)
 
 #define MT_AGG_ACR0(_band)		MT_WF_AGG(_band, __OFFS(AGG_ACR0))
 #define MT_AGG_ACR_CFEND_RATE		GENMASK(13, 0)

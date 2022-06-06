@@ -30,7 +30,7 @@ struct reg_band {
 		{ _list.band[0] = MT_##_reg(0, _idx);	\
 		  _list.band[1] = MT_##_reg(1, _idx); }
 
-#define TM_REG_MAX_ID	17
+#define TM_REG_MAX_ID	20
 static struct reg_band reg_backup_list[TM_REG_MAX_ID];
 
 
@@ -335,7 +335,7 @@ mt7915_tm_reg_backup_restore(struct mt7915_phy *phy)
 {
 	int n_regs = ARRAY_SIZE(reg_backup_list);
 	struct mt7915_dev *dev = phy->dev;
-	u32 *b = phy->test.reg_backup;
+	u32 *b = phy->test.reg_backup, val;
 	int i;
 
 	REG_BAND_IDX(reg_backup_list[0], AGG_PCR0, 0);
@@ -347,18 +347,28 @@ mt7915_tm_reg_backup_restore(struct mt7915_phy *phy)
 	REG_BAND(reg_backup_list[6], AGG_MRCR);
 	REG_BAND(reg_backup_list[7], TMAC_TFCR0);
 	REG_BAND(reg_backup_list[8], TMAC_TCR0);
-	REG_BAND(reg_backup_list[9], AGG_ATCR1);
-	REG_BAND(reg_backup_list[10], AGG_ATCR3);
-	REG_BAND(reg_backup_list[11], TMAC_TRCR0);
-	REG_BAND(reg_backup_list[12], TMAC_ICR0);
-	REG_BAND_IDX(reg_backup_list[13], ARB_DRNGR0, 0);
-	REG_BAND_IDX(reg_backup_list[14], ARB_DRNGR0, 1);
-	REG_BAND(reg_backup_list[15], WF_RFCR);
-	REG_BAND(reg_backup_list[16], WF_RFCR1);
+	REG_BAND(reg_backup_list[9], TMAC_TCR2);
+	REG_BAND(reg_backup_list[10], AGG_ATCR1);
+	REG_BAND(reg_backup_list[11], AGG_ATCR3);
+	REG_BAND(reg_backup_list[12], TMAC_TRCR0);
+	REG_BAND(reg_backup_list[13], TMAC_ICR0);
+	REG_BAND_IDX(reg_backup_list[14], ARB_DRNGR0, 0);
+	REG_BAND_IDX(reg_backup_list[15], ARB_DRNGR0, 1);
+	REG_BAND(reg_backup_list[16], WF_RFCR);
+	REG_BAND(reg_backup_list[17], WF_RFCR1);
+
+	if (is_mt7916(&dev->mt76)) {
+		reg_backup_list[18].band[phy->band_idx] = MT_MDP_TOP_DBG_WDT_CTRL;
+		reg_backup_list[19].band[phy->band_idx] = MT_MDP_TOP_DBG_CTRL;
+	}
 
 	if (phy->mt76->test.state == MT76_TM_STATE_OFF) {
-		for (i = 0; i < n_regs; i++)
-			mt76_wr(dev, reg_backup_list[i].band[phy->band_idx], b[i]);
+		for (i = 0; i < n_regs; i++) {
+			u8 reg = reg_backup_list[i].band[phy->band_idx];
+
+			if (reg)
+				mt76_wr(dev, reg, b[i]);
+		}
 		return;
 	}
 
@@ -378,8 +388,13 @@ mt7915_tm_reg_backup_restore(struct mt7915_phy *phy)
 		   MT_AGG_PCR0_BW40_PROT | MT_AGG_PCR0_BW80_PROT);
 	mt76_set(dev, MT_AGG_PCR0(phy->band_idx, 0), MT_AGG_PCR0_PTA_WIN_DIS);
 
-	mt76_wr(dev, MT_AGG_PCR0(phy->band_idx, 1), MT_AGG_PCR1_RTS0_NUM_THRES |
-		MT_AGG_PCR1_RTS0_LEN_THRES);
+	if (is_mt7915(&dev->mt76))
+		val = MT_AGG_PCR1_RTS0_NUM_THRES | MT_AGG_PCR1_RTS0_LEN_THRES;
+	else
+		val = MT_AGG_PCR1_RTS0_NUM_THRES_MT7916 |
+		      MT_AGG_PCR1_RTS0_LEN_THRES_MT7916;
+
+	mt76_wr(dev, MT_AGG_PCR0(phy->band_idx, 1), val);
 
 	mt76_clear(dev, MT_AGG_MRCR(phy->band_idx), MT_AGG_MRCR_BAR_CNT_LIMIT |
 		   MT_AGG_MRCR_LAST_RTS_CTS_RN | MT_AGG_MRCR_RTS_FAIL_LIMIT |
@@ -392,10 +407,19 @@ mt7915_tm_reg_backup_restore(struct mt7915_phy *phy)
 
 	mt76_wr(dev, MT_TMAC_TFCR0(phy->band_idx), 0);
 	mt76_clear(dev, MT_TMAC_TCR0(phy->band_idx), MT_TMAC_TCR0_TBTT_STOP_CTRL);
+	mt76_set(dev, MT_TMAC_TCR2(phy->band_idx), MT_TMAC_TCR2_SCH_DET_DIS);
 
 	/* config rx filter for testmode rx */
 	mt76_wr(dev, MT_WF_RFCR(phy->band_idx), 0xcf70a);
 	mt76_wr(dev, MT_WF_RFCR1(phy->band_idx), 0);
+
+	if (is_mt7916(&dev->mt76)) {
+		/* enable MDP Tx block mode */
+		mt76_clear(dev, MT_MDP_TOP_DBG_WDT_CTRL,
+			   MT_MDP_TOP_DBG_WDT_CTRL_TDP_DIS_BLK);
+		mt76_clear(dev, MT_MDP_TOP_DBG_CTRL,
+			   MT_MDP_TOP_DBG_CTRL_ENQ_MODE);
+	}
 }
 
 static void

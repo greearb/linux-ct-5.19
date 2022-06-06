@@ -68,6 +68,7 @@ static const u32 mt7986_reg[] = {
 };
 
 static const u32 mt7915_offs[] = {
+	[TMAC_TCR2]		= 0x05c,
 	[TMAC_CDTR]		= 0x090,
 	[TMAC_ODTR]		= 0x094,
 	[TMAC_ATCR]		= 0x098,
@@ -153,6 +154,7 @@ static const u32 mt7915_offs[] = {
 };
 
 static const u32 mt7916_offs[] = {
+	[TMAC_TCR2]		= 0x004,
 	[TMAC_CDTR]		= 0x0c8,
 	[TMAC_ODTR]		= 0x0cc,
 	[TMAC_ATCR]		= 0x00c,
