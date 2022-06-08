@@ -1510,7 +1510,8 @@ mt7921_channel_switch_beacon(struct ieee80211_hw *hw,
 }
 
 static int
-mt7921_start_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
+mt7921_start_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+		unsigned int link_id)
 {
 	struct mt7921_vif *mvif = (struct mt7921_vif *)vif->drv_priv;
 	struct mt7921_phy *phy = mt7921_hw_phy(hw);
@@ -1537,7 +1538,8 @@ out:
 }
 
 static void
-mt7921_stop_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
+mt7921_stop_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+	       unsigned int link_id)
 {
 	struct mt7921_vif *mvif = (struct mt7921_vif *)vif->drv_priv;
 	struct mt7921_phy *phy = mt7921_hw_phy(hw);
