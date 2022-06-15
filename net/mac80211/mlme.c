@@ -4214,7 +4214,14 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 	u8 *bssid, *variable = mgmt->u.beacon.variable;
 	u8 deauth_buf[IEEE80211_DEAUTH_FRAME_LEN];
 
-	BUG_ON(!sdata);
+	if (((unsigned long)sdata) < 4000) {
+		pr_err("sdata: %p bad address\n", sdata);
+		BUG_ON(1);
+	}
+	if (((unsigned long)mgmt) < 4000) {
+		pr_err("mgmt: %p bad address\n", mgmt);
+		BUG_ON(1);
+	}
 
 	ifmgd = &sdata->u.mgd;
 	bss_conf = &sdata->vif.bss_conf;
@@ -4446,10 +4453,25 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 		erp_valid = false;
 	}
 
-	if (!ieee80211_is_s1g_beacon(hdr->frame_control))
+	/* Try to catch info on crash seen on customer system in scale test */
+	if (((unsigned long)hdr) < 4000) {
+		pr_err("hdr: %p bad address\n", hdr);
+		BUG_ON(1);
+	}
+	if (((unsigned long)sdata) < 4000) {
+		pr_err("sdata: %p bad address (2)\n", sdata);
+		BUG_ON(1);
+	}
+
+	if (!ieee80211_is_s1g_beacon(hdr->frame_control)) {
+		if (((unsigned long)mgmt) < 4000) {
+			pr_err("mgmt: %p bad address (2)\n", mgmt);
+			BUG_ON(1);
+		}
 		changed |= ieee80211_handle_bss_capability(sdata,
 				le16_to_cpu(mgmt->u.beacon.capab_info),
 				erp_valid, erp_value);
+	}
 
 	mutex_lock(&local->sta_mtx);
 	sta = sta_info_get(sdata, bssid);
