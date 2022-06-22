@@ -35,6 +35,11 @@ wireless_ctrl_policy[NUM_MTK_VENDOR_ATTRS_WIRELESS_CTRL] = {
 };
 
 static const struct nla_policy
+hemu_ctrl_policy[NUM_MTK_VENDOR_ATTRS_HEMU_CTRL] = {
+	[MTK_VENDOR_ATTR_HEMU_CTRL_ONOFF] = {.type = NLA_U8 },
+};
+
+static const struct nla_policy
 rfeature_ctrl_policy[NUM_MTK_VENDOR_ATTRS_RFEATURE_CTRL] = {
 	[MTK_VENDOR_ATTR_RFEATURE_CTRL_HE_GI] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_RFEATURE_CTRL_HE_LTF] = { .type = NLA_U8 },
@@ -942,6 +947,33 @@ static int mt7915_vendor_wireless_ctrl(struct wiphy *wiphy,
 	return 0;
 }
 
+static int mt7915_vendor_hemu_ctrl(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  const void *data,
+				  int data_len)
+{
+	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
+	struct nlattr *tb[NUM_MTK_VENDOR_ATTRS_HEMU_CTRL];
+	int err;
+	u8 val8;
+	u32 val32 = 0;
+
+	err = nla_parse(tb, MTK_VENDOR_ATTR_HEMU_CTRL_MAX, data, data_len,
+			hemu_ctrl_policy, NULL);
+	if (err)
+		return err;
+
+	if (tb[MTK_VENDOR_ATTR_HEMU_CTRL_ONOFF]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_HEMU_CTRL_ONOFF]);
+		val32 |= FIELD_PREP(RATE_CFG_MODE, RATE_PARAM_AUTO_HEMU) |
+			 FIELD_PREP(RATE_CFG_VAL, val8);
+		ieee80211_iterate_active_interfaces_atomic(hw, IEEE80211_IFACE_ITER_RESUME_ALL,
+			mt7915_set_wireless_vif, &val32);
+	}
+
+	return 0;
+}
+
 static const struct wiphy_vendor_command mt7915_vendor_commands[] = {
 	{
 		.info = {
@@ -988,6 +1020,17 @@ static const struct wiphy_vendor_command mt7915_vendor_commands[] = {
 		.doit = mt7915_vendor_wireless_ctrl,
 		.policy = wireless_ctrl_policy,
 		.maxattr = MTK_VENDOR_ATTR_WIRELESS_CTRL_MAX,
+	},
+	{
+		.info = {
+			.vendor_id = MTK_NL80211_VENDOR_ID,
+			.subcmd = MTK_NL80211_VENDOR_SUBCMD_HEMU_CTRL,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = mt7915_vendor_hemu_ctrl,
+		.policy = hemu_ctrl_policy,
+		.maxattr = MTK_VENDOR_ATTR_HEMU_CTRL_MAX,
 	}
 };
 
