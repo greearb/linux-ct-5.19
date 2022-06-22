@@ -9,6 +9,7 @@
 #include "../mt76_connac.h"
 #include "regs.h"
 
+#define MTK_DEBUG 1
 #define MT7915_MAX_INTERFACES		19
 #define MT7915_WTBL_SIZE		288
 #define MT7916_WTBL_SIZE		544
@@ -418,6 +419,29 @@ struct mt7915_dev {
 	struct reset_control *rstc;
 	void __iomem *dcm;
 	void __iomem *sku;
+
+#ifdef MTK_DEBUG
+	u16 wlan_idx;
+	struct {
+		u32 fixed_rate;
+		u32 l1debugfs_reg;
+		u32 l2debugfs_reg;
+		u32 mac_reg;
+		u32 fw_dbg_module;
+		u8 fw_dbg_lv;
+		u32 bcn_total_cnt[2];
+		u16 fwlog_seq;
+		bool dump_mcu_pkt;
+		bool dump_txd;
+		bool dump_tx_pkt;
+		bool dump_rx_pkt;
+		bool dump_rx_raw;
+		u32 token_idx;
+		u8 sku_disable;
+		u8 muru_onoff;
+	} dbg;
+	const struct mt7915_dbg_reg_desc *dbg_reg;
+#endif
 };
 
 enum {
@@ -687,6 +711,26 @@ int mt7915_dfs_stop_radar_detector(struct mt7915_phy *phy, bool ext_phy);
 #ifdef CONFIG_MAC80211_DEBUGFS
 void mt7915_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			    struct ieee80211_sta *sta, struct dentry *dir);
+#endif
+
+#ifdef MTK_DEBUG
+int mt7915_mtk_init_debugfs(struct mt7915_phy *phy, struct dentry *dir);
+int mt7915_dbg_mcu_wa_cmd(struct mt7915_dev *dev, int cmd, u32 a1, u32 a2, u32 a3, bool wait_resp);
+int mt7915_mcu_set_red(struct mt7915_dev *dev, bool enabled);
+void mt7915_dump_tmac_info(u8 *tmac_info);
+int mt7915_mcu_set_txpower_level(struct mt7915_phy *phy, u8 drop_level);
+void mt7915_packet_log_to_host(struct mt7915_dev *dev, const void *data, int len, int type, int des_len);
+int mt7915_mcu_set_amsdu_algo(struct mt7915_dev *dev, u16 wcid, u8 enable);
+
+#define PKT_BIN_DEBUG_MAGIC	0xc8763123
+enum {
+	PKT_BIN_DEBUG_MCU,
+	PKT_BIN_DEBUG_TXD,
+	PKT_BIN_DEBUG_TX,
+	PKT_BIN_DEBUG_RX,
+	PKT_BIN_DEBUG_RX_RAW,
+};
+
 #endif
 
 #endif

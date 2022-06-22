@@ -73,7 +73,11 @@ int __mt7915_start(struct ieee80211_hw *hw)
 	if (ret)
 		goto out;
 
+#ifdef MTK_DEBUG
+	ret = mt7915_mcu_set_sku_en(phy, !dev->dbg.sku_disable);
+#else
 	ret = mt7915_mcu_set_sku_en(phy, true);
+#endif
 	if (ret)
 		goto out;
 
