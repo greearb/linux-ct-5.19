@@ -797,4 +797,16 @@ enum {
 };
 #endif
 
+enum {
+   EDCCA_CTRL_SET_EN = 0,
+   EDCCA_CTRL_SET_THERS,
+   EDCCA_CTRL_GET_EN,
+   EDCCA_CTRL_GET_THERS,
+   EDCCA_CTRL_NUM,
+};
+
+enum {
+   EDCCA_MODE_FORCE_DISABLE,
+   EDCCA_MODE_AUTO,
+};
 #endif

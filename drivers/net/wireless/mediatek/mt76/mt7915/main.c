@@ -509,6 +509,9 @@ static int mt7915_config(struct ieee80211_hw *hw, u32 changed)
 			mutex_unlock(&dev->mt76.mutex);
 		}
 #endif
+		ret = mt7915_mcu_set_edcca(phy, EDCCA_CTRL_SET_EN, NULL, 0);
+		if (ret)
+			return ret;
 		ieee80211_stop_queues(hw);
 		ret = mt7915_set_channel(phy);
 		if (ret)

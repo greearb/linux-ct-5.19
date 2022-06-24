@@ -797,6 +797,8 @@ void mt7915_vendor_amnt_fill_rx(struct mt7915_phy *phy, struct sk_buff *skb);
 int mt7915_vendor_amnt_sta_remove(struct mt7915_phy *phy,
 				  struct ieee80211_sta *sta);
 #endif
+int mt7915_mcu_set_edcca(struct mt7915_phy *phy, int mode, u8 *value,
+			 s8 compensation);
 
 #ifdef MTK_DEBUG
 int mt7915_mtk_init_debugfs(struct mt7915_phy *phy, struct dentry *dir);

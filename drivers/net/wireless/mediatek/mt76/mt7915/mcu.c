@@ -4393,3 +4393,41 @@ int mt7915_mcu_set_amsdu_algo(struct mt7915_dev *dev, u16 wcid, u8 enable)
 	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(MEC_CTRL), &req, sizeof(req), true);
 }
 #endif
+
+int mt7915_mcu_set_edcca(struct mt7915_phy *phy, int mode, u8 *value,
+			 s8 compensation)
+{
+	static const u8 ch_band[] = {
+		[NL80211_BAND_2GHZ] = 0,
+		[NL80211_BAND_5GHZ] = 1,
+		[NL80211_BAND_6GHZ] = 2,
+	};
+	struct mt7915_dev *dev = phy->dev;
+	struct cfg80211_chan_def *chandef = &phy->mt76->chandef;
+	struct {
+		u8 band_idx;
+		u8 cmd_idx;
+		u8 setting[3];
+		bool record_in_fw;
+		u8 region;
+		s8 thres_compensation;
+	} __packed req = {
+		.band_idx = phy->band_idx,
+		.cmd_idx = mode,
+		.record_in_fw = false,
+		.region = dev->mt76.region,
+		.thres_compensation = compensation,
+	};
+
+	if (ch_band[chandef->chan->band] != 2)
+		return 0;
+
+	if (mode == EDCCA_CTRL_SET_EN) {
+		if (!value)
+			req.setting[0] = EDCCA_MODE_AUTO;
+		else
+			req.setting[0] = value[0];
+	}
+
+	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(EDCCA), &req, sizeof(req), true);
+}
