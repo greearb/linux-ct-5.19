@@ -474,11 +474,11 @@ static int ieee80211_config_bw(struct ieee80211_sub_if_data *sdata,
 
 	sdata_info(sdata,
 		   "AP %pM changed bandwidth, new config is %d.%03d MHz, "
-		   "width %d (%d.%03d/%d MHz) ifmgd-flags: 0x%x\n",
+		   "width %d (%d.%03d/%d MHz) ifmgd-flags: 0x%x eht-oper: %p\n",
 		   ifmgd->bssid, chandef.chan->center_freq,
 		   chandef.chan->freq_offset, chandef.width,
 		   chandef.center_freq1, chandef.freq1_offset,
-		   chandef.center_freq2, ifmgd->flags);
+		   chandef.center_freq2, ifmgd->flags, eht_oper);
 
 	if (flags != (ifmgd->flags & (IEEE80211_STA_DISABLE_HT |
 				      IEEE80211_STA_DISABLE_VHT |
@@ -498,9 +498,11 @@ static int ieee80211_config_bw(struct ieee80211_sub_if_data *sdata,
 			   (ifmgd->flags & (IEEE80211_STA_DISABLE_HT |
 					    IEEE80211_STA_DISABLE_VHT |
 					    IEEE80211_STA_DISABLE_HE |
+					    IEEE80211_STA_DISABLE_EHT |
 					    IEEE80211_STA_DISABLE_40MHZ |
 					    IEEE80211_STA_DISABLE_80P80MHZ |
-					    IEEE80211_STA_DISABLE_160MHZ)));
+					    IEEE80211_STA_DISABLE_160MHZ |
+					    IEEE80211_STA_DISABLE_320MHZ)));
 		return -EINVAL;
 	}
 
