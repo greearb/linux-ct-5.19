@@ -1843,20 +1843,6 @@ void mt7915_mac_update_stats(struct mt7915_phy *phy)
 		mib->tx_amsdu_cnt += cnt;
 	}
 
-	// TODO-BEN:  Need to verify these are OK for 7916
-	cnt = mt76_rr(dev, MT_MIB_M0DROPSR00(phy->band_idx));
-	mib->tx_drop_rts_retry_fail_cnt += FIELD_GET(MT_MIB_RTS_RETRY_FAIL_DROP_MASK, cnt);
-	mib->tx_drop_mpdu_retry_fail_cnt += FIELD_GET(MT_MIB_RTS_RETRY_FAIL_DROP_MASK, cnt);
-
-	cnt = mt76_rr(dev, MT_MIB_M0DROPSR01(phy->band_idx));
-	mib->tx_drop_lto_limit_fail_cnt += FIELD_GET(MT_MIB_LTO_FAIL_DROP_MASK, cnt);
-
-	cnt = mt76_rr(dev, MT_MIB_SDR50(phy->band_idx));
-	mib->tx_dbnss_cnt += FIELD_GET(MT_MIB_DBNSS_CNT_DROP_MASK, cnt);
-
-	cnt = mt76_rr(dev, MT_MIB_SDR51(phy->band_idx));
-	mib->rx_fcs_ok_cnt += FIELD_GET(MT_MIB_RX_FCS_OK_MASK, cnt);
-
 	aggr0 = phy->band_idx ? ARRAY_SIZE(dev->mt76.aggr_stats) / 2 : 0;
 	if (is_mt7915(&dev->mt76)) {
 		for (i = 0, aggr1 = aggr0 + 4; i < 4; i++) {
@@ -1899,6 +1885,20 @@ void mt7915_mac_update_stats(struct mt7915_phy *phy)
 		mib->tx_bf_rx_fb_he_cnt += FIELD_GET(MT_ETBF_RX_FB_HE, cnt);
 		mib->tx_bf_rx_fb_vht_cnt += FIELD_GET(MT_ETBF_RX_FB_VHT, cnt);
 		mib->tx_bf_rx_fb_ht_cnt += FIELD_GET(MT_ETBF_RX_FB_HT, cnt);
+
+		/* TODO-BEN:  See if there is something similar for 7916 */
+		cnt = mt76_rr(dev, MT_MIB_M0DROPSR00(phy->band_idx));
+		mib->tx_drop_rts_retry_fail_cnt += FIELD_GET(MT_MIB_RTS_RETRY_FAIL_DROP_MASK, cnt);
+		mib->tx_drop_mpdu_retry_fail_cnt += FIELD_GET(MT_MIB_RTS_RETRY_FAIL_DROP_MASK, cnt);
+
+		cnt = mt76_rr(dev, MT_MIB_M0DROPSR01(phy->band_idx));
+		mib->tx_drop_lto_limit_fail_cnt += FIELD_GET(MT_MIB_LTO_FAIL_DROP_MASK, cnt);
+
+		cnt = mt76_rr(dev, MT_MIB_SDR50(phy->band_idx));
+		mib->tx_dbnss_cnt += FIELD_GET(MT_MIB_DBNSS_CNT_DROP_MASK, cnt);
+
+		cnt = mt76_rr(dev, MT_MIB_SDR51(phy->band_idx));
+		mib->rx_fcs_ok_cnt += FIELD_GET(MT_MIB_RX_FCS_OK_MASK, cnt);
 	} else {
 		for (i = 0; i < 2; i++) {
 			/* rts count */
