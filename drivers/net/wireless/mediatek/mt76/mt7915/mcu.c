@@ -4140,37 +4140,33 @@ void mt7915_mcu_set_dynalgo(struct mt7915_phy *phy, u8 enable)
 			&req, sizeof(req), false);
 }
 
-void mt7915_mcu_set_cert(struct mt7915_phy *phy, u8 type)
+int mt7915_mcu_set_cfg(struct mt7915_phy *phy, u8 cfg_info, u8 type)
 {
-#define CFGINFO_CERT_CFG 4
 	struct mt7915_dev *dev = phy->dev;
-	struct {
-		struct basic_info{
-			u8 dbdc_idx;
-			u8 rsv[3];
-			__le32 tlv_num;
-			u8 tlv_buf[0];
-		} hdr;
-		struct cert_cfg{
-			__le16 tag;
-			__le16 length;
-			u8 cert_program;
-			u8 rsv[3];
-		} tlv;
-	} req = {
-		.hdr = {
-			.dbdc_idx = phy != &dev->phy,
-			.tlv_num = cpu_to_le32(1),
-		},
-		.tlv = {
-			.tag = cpu_to_le16(CFGINFO_CERT_CFG),
-			.length = cpu_to_le16(sizeof(struct cert_cfg)),
-			.cert_program = type, /* 1: CAPI Enable */
-		}
+	struct cfg_basic_info req = {
+		.dbdc_idx = phy != &dev->phy,
+		.tlv_num = cpu_to_le32(1),
 	};
+	int tlv_len;
 
-	mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(CERT_CFG),
-			  &req, sizeof(req), false);
+	switch (cfg_info) {
+	case CFGINFO_CERT_CFG:
+		tlv_len = sizeof(struct cert_cfg);
+		req.cert.tag = cpu_to_le16(cfg_info);
+		req.cert.length = cpu_to_le16(tlv_len);
+		req.cert.cert_program = type;
+		break;
+	case CFGINFO_3WIRE_EN_CFG:
+		tlv_len = sizeof(struct three_wire_cfg);
+		req.three_wire.tag = cpu_to_le16(cfg_info);
+		req.three_wire.length = cpu_to_le16(tlv_len);
+		req.three_wire.three_wire_en = type;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(SET_CFG), &req, sizeof(req), false);
 }
 
 void mt7915_mcu_set_bypass_smthint(struct mt7915_phy *phy, u8 val)

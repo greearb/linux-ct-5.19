@@ -584,6 +584,35 @@ struct csi_data {
 };
 #endif
 
+struct cert_cfg {
+	__le16 tag;
+	__le16 length;
+	u8 cert_program;
+	u8 rsv[3];
+} __packed;
+
+struct three_wire_cfg {
+	__le16 tag;
+	__le16 length;
+	u8 three_wire_en;
+	u8 rsv[3];
+} __packed;
+
+struct cfg_basic_info {
+	u8 dbdc_idx;
+	u8 rsv[3];
+	__le32 tlv_num;
+	union {
+		struct cert_cfg cert;
+		struct three_wire_cfg three_wire;
+	};
+} __packed;
+
+enum {
+	CFGINFO_CERT_CFG = 4,
+	CFGINFO_3WIRE_EN_CFG = 10,
+};
+
 /* MURU */
 #define OFDMA_DL                       BIT(0)
 #define OFDMA_UL                       BIT(1)

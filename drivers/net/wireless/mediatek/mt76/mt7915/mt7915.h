@@ -799,6 +799,7 @@ void mt7915_mcu_set_mimo(struct mt7915_phy *phy, u8 direction);
 void mt7915_mcu_set_dynalgo(struct mt7915_phy *phy, u8 enable);
 int mt7915_mcu_set_mu_edca(struct mt7915_phy *phy, u8 val);
 void mt7915_mcu_set_cert(struct mt7915_phy *phy, u8 type);
+int mt7915_mcu_set_cfg(struct mt7915_phy *phy, u8 cfg_info, u8 type);
 void mt7915_mcu_set_bypass_smthint(struct mt7915_phy *phy, u8 val);
 void mt7915_vendor_register(struct mt7915_phy *phy);
 int mt7915_mcu_set_csi(struct mt7915_phy *phy, u8 mode,
