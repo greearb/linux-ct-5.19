@@ -81,6 +81,11 @@ struct tm_tx_cont {
 	u8 txfd_mode;
 };
 
+struct tm_cal_param {
+	__le32 func_data;
+	u8 band_idx;
+};
+
 struct mt7915_tm_rf_test {
 	u8 action;
 	u8 icap_len;
@@ -96,11 +101,26 @@ struct mt7915_tm_rf_test {
 				__le32 cal_dump;
 
 				struct tm_tx_cont tx_cont;
+				struct tm_cal_param cal_param;
 
 				u8 _pad[80];
 			} param;
 		} rf;
 	} op;
+} __packed;
+
+struct mt7915_tm_rf_test_result {
+	struct mt76_connac2_mcu_rxd rxd;
+
+	u32 func_idx;
+	u32 payload_len;
+	u8 event[0];
+} __packed;
+
+struct mt7915_tm_rf_test_data {
+	u32 cal_idx;
+	u32 cal_type;
+	u8 data[0];
 } __packed;
 
 enum {
@@ -110,6 +130,22 @@ enum {
 	RF_OPER_ICAP_OVERLAP,
 	RF_OPER_WIFI_SPECTRUM,
 };
+
+enum {
+	RF_ACT_SWITCH_MODE,
+	RF_ACT_IN_RFTEST,
+};
+
+enum {
+	RF_TEST_RE_CAL = 0x01,
+	RF_TEST_TX_CONT_START = 0x05,
+	RF_TEST_TX_CONT_STOP = 0x06,
+};
+
+#define RF_DPD_FLAT_CAL		BIT(28)
+#define RF_PRE_CAL		BIT(29)
+#define RF_DPD_FLAT_5G_CAL	GENMASK(29, 28)
+#define RF_DPD_FLAT_6G_CAL	(BIT(30) | BIT(28))
 
 enum {
 	TAM_ARB_OP_MODE_NORMAL = 1,

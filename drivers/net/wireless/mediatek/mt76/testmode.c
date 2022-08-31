@@ -759,6 +759,18 @@ int mt76_testmode_dump(struct ieee80211_hw *hw, struct sk_buff *msg,
 
 	mutex_lock(&dev->mutex);
 
+	if (tb[MT76_TM_ATTR_PRECAL] || tb[MT76_TM_ATTR_PRECAL_INFO]) {
+		int flag, type;
+
+		err = -EINVAL;
+		flag = tb[MT76_TM_ATTR_PRECAL] ? 1 : 0;
+		type = flag ? nla_get_u8(tb[MT76_TM_ATTR_PRECAL_INFO]) : 0;
+		if (dev->test_ops->dump_precal)
+			err = dev->test_ops->dump_precal(phy, msg, flag, type);
+
+		goto out;
+	}
+
 	if (tb[MT76_TM_ATTR_STATS]) {
 		err = -EINVAL;
 
@@ -792,7 +804,8 @@ int mt76_testmode_dump(struct ieee80211_hw *hw, struct sk_buff *msg,
 
 	if (dev->test_mtd.name &&
 	    (nla_put_string(msg, MT76_TM_ATTR_MTD_PART, dev->test_mtd.name) ||
-	     nla_put_u32(msg, MT76_TM_ATTR_MTD_OFFSET, dev->test_mtd.offset)))
+	     nla_put_u32(msg, MT76_TM_ATTR_MTD_OFFSET, dev->test_mtd.offset) ||
+	     nla_put_u8(msg, MT76_TM_ATTR_IS_MAIN_PHY, phy == &dev->phy)))
 		goto out;
 
 	if (nla_put_u32(msg, MT76_TM_ATTR_TX_COUNT, td->tx_count) ||

@@ -974,6 +974,7 @@ enum {
 
 /* ext event table */
 enum {
+	MCU_EXT_EVENT_RF_TEST = 0x4,
 	MCU_EXT_EVENT_PS_SYNC = 0x5,
 	MCU_EXT_EVENT_FW_LOG_2_HOST = 0x13,
 	MCU_EXT_EVENT_THERMAL_PROTECT = 0x22,

@@ -619,6 +619,7 @@ struct mt76_testmode_ops {
 			  enum mt76_testmode_state new_state);
 	int (*dump_stats)(struct mt76_phy *phy, struct sk_buff *msg);
 	int (*set_eeprom)(struct mt76_phy *phy, u32 offset, u8 *val, u8 action);
+	int (*dump_precal)(struct mt76_phy *phy, struct sk_buff *msg, int flag, int type);
 };
 
 struct mt76_testmode_entry_data {

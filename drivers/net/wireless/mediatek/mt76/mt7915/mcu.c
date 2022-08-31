@@ -416,6 +416,9 @@ mt7915_mcu_rx_log_message(struct mt7915_dev *dev, struct sk_buff *skb)
 	case MCU_EXT_EVENT_BF_STATUS_READ:
 		mt7915_tm_txbf_status_read(dev, skb);
 		break;
+	case MCU_EXT_EVENT_RF_TEST:
+		mt7915_tm_rf_test_event(dev, skb);
+		break;
 #endif
 	default:
 		type = "unknown";
@@ -3047,8 +3050,9 @@ int mt7915_mcu_apply_group_cal(struct mt7915_dev *dev)
 {
 	u8 idx = 0, *cal = dev->cal, *eep = dev->mt76.eeprom.data;
 	u32 total = MT_EE_CAL_GROUP_SIZE;
+	int offs = MT_EE_DO_PRE_CAL; // TODO:  Hack to make patch work. --Ben
 
-	if (!(eep[MT_EE_DO_PRE_CAL] & MT_EE_WIFI_CAL_GROUP))
+	if (!(eep[offs] & MT_EE_WIFI_CAL_GROUP))
 		return 0;
 
 	/*
@@ -3128,11 +3132,29 @@ int mt7915_mcu_apply_tx_dpd(struct mt7915_phy *phy)
 {
 	struct mt7915_dev *dev = phy->dev;
 	struct cfg80211_chan_def *chandef = &phy->mt76->chandef;
-	u16 total = 2, center_freq = chandef->center_freq1;
+	enum nl80211_band band = chandef->chan->band;
+	u32 offs = is_mt7915(&dev->mt76) ? MT_EE_DO_PRE_CAL : MT_EE_DO_PRE_CAL_V2;
+	u16 center_freq = chandef->center_freq1;
 	u8 *cal = dev->cal, *eep = dev->mt76.eeprom.data;
+	u8 dpd_mask, cal_num = is_mt7915(&dev->mt76) ? 2 : 3;
 	int idx;
 
-	if (!(eep[MT_EE_DO_PRE_CAL] & MT_EE_WIFI_CAL_DPD))
+	switch (band) {
+	case NL80211_BAND_2GHZ:
+		dpd_mask = MT_EE_WIFI_CAL_DPD_2G;
+		break;
+	case NL80211_BAND_5GHZ:
+		dpd_mask = MT_EE_WIFI_CAL_DPD_5G;
+		break;
+	case NL80211_BAND_6GHZ:
+		dpd_mask = MT_EE_WIFI_CAL_DPD_6G;
+		break;
+	default:
+		dpd_mask = 0;
+		break;
+	}
+
+	if (!(eep[offs] & dpd_mask))
 		return 0;
 
 	idx = mt7915_dpd_freq_idx(center_freq, chandef->width);

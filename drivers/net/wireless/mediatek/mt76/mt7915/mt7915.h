@@ -450,6 +450,10 @@ struct mt7915_dev {
 	struct rchan *relay_fwlog;
 
 	void *cal;
+	u32 cur_prek_offset;
+	u8 dpd_chan_num_2g;
+	u8 dpd_chan_num_5g;
+	u8 dpd_chan_num_6g;
 
 	struct {
 		u8 debug_wm;
@@ -687,6 +691,7 @@ int mt7915_mcu_fw_dbg_ctrl(struct mt7915_dev *dev, u32 module, u8 level);
 void mt7915_mcu_rx_event(struct mt7915_dev *dev, struct sk_buff *skb);
 void mt7915_mcu_exit(struct mt7915_dev *dev);
 int mt7915_tm_txbf_status_read(struct mt7915_dev *dev, struct sk_buff *skb);
+void mt7915_tm_rf_test_event(struct mt7915_dev *dev, struct sk_buff *skb);
 
 static inline u16 mt7915_wtbl_size(struct mt7915_dev *dev)
 {
