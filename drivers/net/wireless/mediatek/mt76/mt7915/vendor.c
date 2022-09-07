@@ -78,6 +78,16 @@ edcca_ctrl_policy[NUM_MTK_VENDOR_ATTRS_EDCCA_CTRL] = {
        [MTK_VENDOR_ATTR_EDCCA_CTRL_COMPENSATE] = { .type = NLA_S8 },
 };
 
+static const struct nla_policy
+ibf_ctrl_policy[NUM_MTK_VENDOR_ATTRS_IBF_CTRL] = {
+	[MTK_VENDOR_ATTR_IBF_CTRL_ENABLE] = { .type = NLA_U8 },
+};
+
+static struct nla_policy
+ibf_dump_policy[NUM_MTK_VENDOR_ATTRS_IBF_DUMP] = {
+	[MTK_VENDOR_ATTR_IBF_DUMP_ENABLE] = { .type = NLA_U8 },
+};
+
 
 struct csi_null_tone {
 	u8 start;
@@ -1120,6 +1130,54 @@ static int mt7915_vendor_3wire_ctrl(struct wiphy *wiphy,
 	return mt7915_mcu_set_cfg(phy, CFGINFO_3WIRE_EN_CFG, three_wire_mode);
 }
 
+static int mt7915_vendor_ibf_ctrl(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  const void *data,
+				  int data_len)
+{
+	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
+	struct mt7915_phy *phy = mt7915_hw_phy(hw);
+	struct mt7915_dev *dev = phy->dev;
+	struct nlattr *tb[NUM_MTK_VENDOR_ATTRS_IBF_CTRL];
+	int err;
+	u8 val;
+
+	err = nla_parse(tb, MTK_VENDOR_ATTR_IBF_CTRL_MAX, data, data_len,
+			ibf_ctrl_policy, NULL);
+	if (err)
+		return err;
+
+	if (tb[MTK_VENDOR_ATTR_IBF_CTRL_ENABLE]) {
+		val = nla_get_u8(tb[MTK_VENDOR_ATTR_IBF_CTRL_ENABLE]);
+
+		dev->ibf = !!val;
+
+		err = mt7915_mcu_set_txbf(dev, MT_BF_TYPE_UPDATE);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
+static int
+mt7915_vendor_ibf_ctrl_dump(struct wiphy *wiphy, struct wireless_dev *wdev,
+			     struct sk_buff *skb, const void *data, int data_len,
+			     unsigned long *storage)
+{
+	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
+	struct mt7915_phy *phy = mt7915_hw_phy(hw);
+	struct mt7915_dev *dev = phy->dev;
+
+	if (*storage == 1)
+		return -ENOENT;
+	*storage = 1;
+
+	if (nla_put_u8(skb, MTK_VENDOR_ATTR_IBF_DUMP_ENABLE, dev->ibf))
+		return -ENOMEM;
+
+	return 1;
+}
+
 
 static const struct wiphy_vendor_command mt7915_vendor_commands[] = {
 	{
@@ -1212,6 +1270,18 @@ static const struct wiphy_vendor_command mt7915_vendor_commands[] = {
 		.doit = mt7915_vendor_3wire_ctrl,
 		.policy = three_wire_ctrl_policy,
 		.maxattr = MTK_VENDOR_ATTR_3WIRE_CTRL_MAX,
+	},
+	{
+		.info = {
+			.vendor_id = MTK_NL80211_VENDOR_ID,
+			.subcmd = MTK_NL80211_VENDOR_SUBCMD_IBF_CTRL,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = mt7915_vendor_ibf_ctrl,
+		.dumpit = mt7915_vendor_ibf_ctrl_dump,
+		.policy = ibf_ctrl_policy,
+		.maxattr = MTK_VENDOR_ATTR_IBF_CTRL_MAX,
 	}
 };
 
