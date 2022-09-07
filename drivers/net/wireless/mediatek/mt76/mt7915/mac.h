@@ -39,8 +39,10 @@ enum rx_pkt_type {
 #define MT_TX_FREE_LATENCY		GENMASK(12, 0)
 /* when configured for txcount mode.  See MT_PLE_HOST_RPT0_TX_LATENCY. */
 #define MT_TX_FREE_TXCNT		GENMASK(12, 0)
+#define MT_TX_FREE_TXCNT_V3		GENMASK(27, 24)
 /* 0: success, others: dropped */
 #define MT_TX_FREE_STATUS_V1		GENMASK(14, 13)
+#define MT_TX_FREE_STATUS_V3		GENMASK(29, 28) /* DW3 */
 /* 0:  not MPDU, 1:  MSDU is head pkt of TXD page (MPDU) */
 #define MT_TX_FREE_HEAD_OF_PAGE		BIT(15)
 #define MT_TX_FREE_MSDU_ID		GENMASK(30, 16)
