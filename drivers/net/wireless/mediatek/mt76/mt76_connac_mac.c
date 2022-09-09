@@ -573,6 +573,10 @@ bool mt76_connac2_mac_add_txs_skb(struct mt76_dev *dev, struct mt76_wcid *wcid,
 	}
 
 	txs = le32_to_cpu(txs_data[0]);
+	/*
+	txs2 = le32_to_cpu(txs_data[2]);
+	TODO:  Add tx-bf stats in DW2: no-bf, ibf, ebf, mubf?
+	*/
 
 	if (skb) {
 		info = IEEE80211_SKB_CB(skb);
@@ -583,6 +587,9 @@ bool mt76_connac2_mac_add_txs_skb(struct mt76_dev *dev, struct mt76_wcid *wcid,
 		info->status.ampdu_ack_len = !!(info->flags &
 						IEEE80211_TX_STAT_ACK);
 	}
+
+	mtk_dbg(dev, TX, "wcid: %d connac2_mac_add_txs_skb, pid: %d err-msk: 0x%x",
+		wcid->idx, pid, (u32)(txs & MT_TXS0_ACK_ERROR_MASK));
 
 	txrate = FIELD_GET(MT_TXS0_TX_RATE, txs);
 
