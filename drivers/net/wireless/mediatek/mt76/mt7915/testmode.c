@@ -701,6 +701,7 @@ mt7915_tm_txbf_profile_update(struct mt7915_phy *phy, u16 *val, bool ebf)
 	struct ieee80211_vif *vif = phy->monitor_vif;
 	struct mt7915_tm_pfmu_tag *tag = phy->dev->test.txbf_pfmu_tag;
 	u8 pfmu_idx = val[0], nc = val[2], nr;
+	bool is_atenl = val[6];
 	int ret;
 
 	if (td->tx_antenna_mask == 3)
@@ -748,7 +749,7 @@ mt7915_tm_txbf_profile_update(struct mt7915_phy *phy, u16 *val, bool ebf)
 	if (ret)
 		return ret;
 
-	if (!ebf)
+	if (!ebf && is_atenl)
 		return mt7915_tm_txbf_apply_tx(phy, 1, false, true, true);
 
 	return 0;
@@ -775,7 +776,7 @@ mt7915_tm_txbf_phase_cal(struct mt7915_phy *phy, u16 *val)
 		.group_l_m_n = val[1],
 		.sx2 = val[2],
 		.cal_type = val[3],
-		.lna_gain_level = 0, /* for test purpose */
+		.lna_gain_level = val[4],
 	};
 	struct mt7915_tm_txbf_phase *phase =
 		(struct mt7915_tm_txbf_phase *)dev->test.txbf_phase_cal;
@@ -814,6 +815,8 @@ int mt7915_tm_txbf_status_read(struct mt7915_dev *dev, struct sk_buff *skb)
 			phase = &phase[cal->group];
 			memcpy(&phase->phase, cal->buf + 16, sizeof(phase->phase));
 			phase->status = cal->status;
+			/* for passing iTest script */
+			dev_info(dev->mt76.dev, "Calibrated result = %d\n", phase->status);
 			break;
 		case IBF_PHASE_CAL_VERIFY:
 		case IBF_PHASE_CAL_VERIFY_INSTRUMENT:
@@ -865,7 +868,6 @@ mt7915_tm_txbf_profile_update_all(struct mt7915_phy *phy, u16 *val)
 	pfmu_data->phi11 = cpu_to_le16(phi11);
 	pfmu_data->phi21 = cpu_to_le16(phi21);
 	pfmu_data->phi31 = cpu_to_le16(phi31);
-
 	if (subc_id == 63) {
 		struct mt7915_dev *dev = phy->dev;
 		struct {
@@ -923,8 +925,8 @@ mt7915_tm_set_txbf(struct mt7915_phy *phy)
 	struct mt76_testmode_data *td = &phy->mt76->test;
 	u16 *val = td->txbf_param;
 
-	pr_info("ibf cal process: act = %u, val = %u, %u, %u, %u, %u\n",
-		td->txbf_act, val[0], val[1], val[2], val[3], val[4]);
+	pr_info("ibf cal process: act = %u, val = %u, %u, %u, %u, %u, %u\n",
+		td->txbf_act, val[0], val[1], val[2], val[3], val[4], val[5]);
 
 	switch (td->txbf_act) {
 	case MT76_TM_TXBF_ACT_INIT:
@@ -942,10 +944,17 @@ mt7915_tm_set_txbf(struct mt7915_phy *phy)
 		return mt7915_tm_txbf_profile_update(phy, val, true);
 	case MT76_TM_TXBF_ACT_PHASE_CAL:
 		return mt7915_tm_txbf_phase_cal(phy, val);
+	case MT76_TM_TXBF_ACT_PROF_UPDATE_ALL_CMD:
 	case MT76_TM_TXBF_ACT_PROF_UPDATE_ALL:
 		return mt7915_tm_txbf_profile_update_all(phy, val);
 	case MT76_TM_TXBF_ACT_E2P_UPDATE:
 		return mt7915_tm_txbf_e2p_update(phy);
+	case MT76_TM_TXBF_ACT_APPLY_TX: {
+		u16 wlan_idx = val[0];
+		bool ebf = !!val[1], ibf = !!val[2], phase_cal = !!val[4];
+
+		return mt7915_tm_txbf_apply_tx(phy, wlan_idx, ebf, ibf, phase_cal);
+	}
 	default:
 		break;
 	};
@@ -1071,7 +1080,6 @@ mt7915_tm_set_tx_len(struct mt7915_phy *phy, u32 tx_time)
 		rate.legacy = sband->bitrates[rate.mcs].bitrate;
 		break;
 	case MT76_TM_TX_MODE_HT:
-		rate.mcs += rate.nss * 8;
 		flags |= RATE_INFO_FLAGS_MCS;
 
 		if (td->tx_rate_sgi)
@@ -1437,7 +1445,6 @@ mt7915_tm_set_tx_frames(struct mt7915_phy *phy, bool en)
 			if (duty_cycle < 100)
 				tx_time = duty_cycle * ipg / (100 - duty_cycle);
 		}
-
 		mt7915_tm_set_ipg_params(phy, ipg, td->tx_rate_mode);
 		mt7915_tm_set_tx_len(phy, tx_time);
 
