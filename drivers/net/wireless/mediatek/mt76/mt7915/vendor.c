@@ -30,8 +30,16 @@ wireless_ctrl_policy[NUM_MTK_VENDOR_ATTRS_WIRELESS_CTRL] = {
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_NUSERS_OFDMA] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_MIMO] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_BA_BUFFER_SIZE] = {.type = NLA_U16 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_AMPDU] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_AMSDU] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_MU_EDCA] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_CERT] = {.type = NLA_U8 },
+};
+
+static const struct nla_policy
+wireless_dump_policy[NUM_MTK_VENDOR_ATTRS_WIRELESS_DUMP] = {
+	[MTK_VENDOR_ATTR_WIRELESS_DUMP_AMPDU] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_DUMP_AMSDU] = { .type = NLA_U8 },
 };
 
 static const struct nla_policy
@@ -981,9 +989,39 @@ static int mt7915_vendor_wireless_ctrl(struct wiphy *wiphy,
 		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_CERT]);
 		mt7915_mcu_set_cfg(phy, CFGINFO_CERT_CFG, val8); /* Cert Enable for OMI */
 		mt7915_mcu_set_bypass_smthint(phy, val8); /* Cert bypass smooth interpolation */
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_AMPDU]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_AMPDU]);
+		mt7915_set_wireless_ampdu(hw, val8);
+	} else if (tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_AMSDU]) {
+		val8 = nla_get_u8(tb[MTK_VENDOR_ATTR_WIRELESS_CTRL_AMSDU]);
+		mt7915_set_wireless_amsdu(hw, val8);
 	}
 
 	return 0;
+}
+
+static int
+mt7915_vendor_wireless_ctrl_dump(struct wiphy *wiphy, struct wireless_dev *wdev,
+			     struct sk_buff *skb, const void *data, int data_len,
+			     unsigned long *storage)
+{
+	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
+	struct mt7915_phy *phy = mt7915_hw_phy(hw);
+	struct mt7915_dev *dev = phy->dev;
+	int len = 0;
+	if (*storage == 1)
+		return -ENOENT;
+	*storage = 1;
+
+
+	if (nla_put_u8(skb,
+	    MTK_VENDOR_ATTR_WIRELESS_DUMP_AMPDU, ieee80211_hw_check(hw, AMPDU_AGGREGATION)) ||
+	    nla_put_u8(skb,
+	    MTK_VENDOR_ATTR_WIRELESS_DUMP_AMSDU, ieee80211_hw_check(hw, SUPPORTS_AMSDU_IN_AMPDU)))
+		return -ENOMEM;
+	len += 2;
+
+	return len;
 }
 
 static int mt7915_vendor_hemu_ctrl(struct wiphy *wiphy,
@@ -1223,6 +1261,7 @@ static const struct wiphy_vendor_command mt7915_vendor_commands[] = {
 		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV |
 			WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = mt7915_vendor_wireless_ctrl,
+		.dumpit = mt7915_vendor_wireless_ctrl_dump,
 		.policy = wireless_ctrl_policy,
 		.maxattr = MTK_VENDOR_ATTR_WIRELESS_CTRL_MAX,
 	},

@@ -787,6 +787,8 @@ void mt7915_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 #endif
 
 #ifdef CONFIG_MTK_VENDOR
+void mt7915_set_wireless_ampdu(struct ieee80211_hw *hw, u8 en);
+void mt7915_set_wireless_amsdu(struct ieee80211_hw *hw, u8 en);
 void mt7915_capi_sta_rc_work(void *data, struct ieee80211_sta *sta);
 void mt7915_set_wireless_vif(void *data, u8 *mac, struct ieee80211_vif *vif);
 void mt7915_mcu_set_rfeature_starec(void *data, struct mt7915_dev *dev,

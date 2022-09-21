@@ -2240,6 +2240,34 @@ static void mt7915_mac_severe_check(struct mt7915_phy *phy)
 	phy->trb_ts = trb;
 }
 
+void mt7915_set_wireless_ampdu(struct ieee80211_hw *hw, u8 en)
+{
+	ieee80211_del_all_station(hw);
+	/* clear/set the feature ampdu support */
+	if (en)
+		ieee80211_hw_set(hw, AMPDU_AGGREGATION);
+	else
+		ieee80211_hw_clear(hw, AMPDU_AGGREGATION);
+}
+
+void mt7915_set_wireless_amsdu(struct ieee80211_hw *hw, u8 en) {
+	struct mt76_phy *mphy = hw->priv;
+	struct mt76_dev *mdev = mphy->dev;
+
+	if (!ieee80211_hw_check(hw, AMPDU_AGGREGATION)) {
+		dev_err(mdev->dev, "AMSDU set failed, please enable ampdu first!\n");
+		return;
+	}
+
+	ieee80211_del_all_station(hw);
+
+	/* clear/set the feature ampdu support */
+	if (en)
+		ieee80211_hw_set(hw, SUPPORTS_AMSDU_IN_AMPDU);
+	else
+		ieee80211_hw_clear(hw, SUPPORTS_AMSDU_IN_AMPDU);
+}
+
 #ifdef CONFIG_MTK_VENDOR
 void mt7915_capi_sta_rc_work(void *data, struct ieee80211_sta *sta)
 {
