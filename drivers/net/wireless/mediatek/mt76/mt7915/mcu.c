@@ -329,6 +329,10 @@ mt7915_mcu_rx_log_message(struct mt7915_dev *dev, struct sk_buff *skb)
 	case 2:
 		type = "WA";
 		break;
+	case MCU_EXT_EVENT_ASSERT_DUMP:
+		mt76_connac_mcu_coredump_event(&dev->mt76, skb,
+					       &dev->coredump);
+		break;
 	default:
 		type = "unknown";
 		break;

@@ -404,6 +404,8 @@ struct mt7915_dev {
 		u8 n_agrt;
 	} twt;
 
+	struct mt76_connac_coredump coredump;
+
 	struct reset_control *rstc;
 	void __iomem *dcm;
 	void __iomem *sku;
@@ -655,6 +657,7 @@ void mt7915_update_channel(struct mt76_phy *mphy);
 int mt7915_mcu_muru_debug_set(struct mt7915_dev *dev, bool enable);
 int mt7915_mcu_muru_debug_get(struct mt7915_phy *phy);
 int mt7915_init_debugfs(struct mt7915_phy *phy);
+void mt7915_coredump_work(struct work_struct *work);
 void mt7915_debugfs_rx_fw_monitor(struct mt7915_dev *dev, const void *data, int len);
 bool mt7915_debugfs_rx_log(struct mt7915_dev *dev, const void *data, int len);
 int mt7915_dfs_stop_radar_detector(struct mt7915_phy *phy, bool ext_phy);
