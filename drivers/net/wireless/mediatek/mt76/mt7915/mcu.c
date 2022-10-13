@@ -2970,7 +2970,7 @@ int mt7915_mcu_set_eeprom(struct mt7915_dev *dev, bool flash_mode)
 				 &req, sizeof(req), true);
 }
 
-int mt7915_mcu_get_eeprom(struct mt7915_dev *dev, u32 offset)
+int mt7915_mcu_get_eeprom(struct mt7915_dev *dev, u32 offset, u8 *read_buf)
 {
 	struct mt7915_mcu_eeprom_info req = {
 		.addr = cpu_to_le32(round_down(offset,
@@ -2987,8 +2987,15 @@ int mt7915_mcu_get_eeprom(struct mt7915_dev *dev, u32 offset)
 		return ret;
 
 	res = (struct mt7915_mcu_eeprom_info *)skb->data;
-	buf = dev->mt76.eeprom.data + le32_to_cpu(res->addr);
-	memcpy(buf, res->data, MT7915_EEPROM_BLOCK_SIZE);
+
+	if (read_buf) {
+		u32 offs = offset % MT7915_EEPROM_BLOCK_SIZE;
+		*read_buf = res->data[offs];
+	} else {
+		buf = dev->mt76.eeprom.data + le32_to_cpu(res->addr);
+		memcpy(buf, res->data, MT7915_EEPROM_BLOCK_SIZE);
+	}
+
 	dev_kfree_skb(skb);
 
 	return 0;
