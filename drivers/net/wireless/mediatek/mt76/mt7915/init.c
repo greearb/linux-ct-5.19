@@ -10,7 +10,12 @@
 #include "mcu.h"
 #include "eeprom.h"
 
-#define MT76_DRIVER_VERSION "5.17.0-ct"
+#define MT76_DRIVER_VERSION "5.19.0-ct"
+
+static int fw_ser_enable = 0;
+module_param(fw_ser_enable, int, 0644);
+MODULE_PARM_DESC(fw_ser_enable,
+		 "Set to 1 to enable firmware recovery (SER) on startup.");
 
 static const struct ieee80211_iface_limit if_limits[] = {
 	{
@@ -715,6 +720,28 @@ mt7915_init_hardware(struct mt7915_dev *dev, struct mt7915_phy *phy2)
 	dev->mt76.global_wcid.hw_key_idx = -1;
 	dev->mt76.global_wcid.tx_info |= MT_WCID_TX_INFO_SET;
 	rcu_assign_pointer(dev->mt76.wcid[idx], &dev->mt76.global_wcid);
+
+	if (fw_ser_enable) {
+		u32 intr;
+		u8 band_idx = dev->phy.band_idx;
+		u8 ser_action = 0x1; /* set */
+		u8 ser_set = 0x3; /* enable 10.5 recover function */
+
+		/* see debugfs, mt7915_fw_ser_set */
+		/* SER-SET:  0x103 */
+		dev->ser.reset_enable = true;
+		intr |= MT_MCU_CMD_WDT_MASK;
+		intr = mt76_rr(dev, MT_WFDMA0_MCU_HOST_INT_ENA);
+		mt76_set(dev, MT_WFDMA0_MCU_HOST_INT_ENA, intr);
+
+		ret = mt7915_mcu_set_ser(dev, ser_action, ser_set, band_idx);
+		dev_info(dev->mt76.dev, "mt7915: Enable SER 0x103 in init, ret: %d\n", ret);
+
+		ser_set = 0x7f; /* enable all recovery options */
+		ser_action = 0x2; /* SER ENABLE */
+		ret = mt7915_mcu_set_ser(dev, ser_action, ser_set, band_idx);
+		dev_info(dev->mt76.dev, "mt7915: Set SER 0x27f in init, ret: %d\n", ret);
+	}
 
 	return 0;
 }
