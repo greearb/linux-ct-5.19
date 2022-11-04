@@ -90,6 +90,19 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 		goto out;
 	}
 
+	/* If we have too many sequential timeouts, then don't wait...saves us blocking
+	 * everything waiting for response that will never come.
+	 */
+	if (dev->mcu_ops->get_fail_count) {
+		u32 fc = dev->mcu_ops->get_fail_count(dev);
+		if (fc > 3) {
+			/* This thing is wedged, do not wait with lock held. */
+			dev_info(dev->dev, "MCU hung, fail-count: %d.  Not waiting for response.\n", fc);
+			ret = -EAGAIN;
+			goto out;
+		}
+	}
+
 	expires = jiffies + dev->mcu.timeout;
 
 	do {

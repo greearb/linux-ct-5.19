@@ -220,6 +220,7 @@ struct mt76_mcu_ops {
 	int (*mcu_rd_rp)(struct mt76_dev *dev, u32 base,
 			 struct mt76_reg_pair *rp, int len);
 	int (*mcu_restart)(struct mt76_dev *dev);
+	int (*get_fail_count)(struct mt76_dev *dev); /* mcu sequential fail count */
 };
 
 struct mt76_queue_ops {

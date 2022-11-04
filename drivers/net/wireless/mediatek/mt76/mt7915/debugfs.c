@@ -490,62 +490,11 @@ out:
 }
 
 static int
-mt7915_fw_debug_wm_set(void *data, u64 val)
+_mt7915_fw_debug_wm_set(void *data, u64 val)
 {
 	struct mt7915_dev *dev = data;
-	bool tx, rx, en;
-	int ret;
-	enum mt_debug debug;
 
-	dev->fw.debug_wm = val ? MCU_FW_LOG_TO_HOST : 0;
-#ifdef MTK_DEBUG
-	dev->fw.debug_wm = val;
-#endif
-
-	if (dev->fw.debug_bin)
-		val = 16;
-	else
-		val = dev->fw.debug_wm;
-
-	tx = dev->fw.debug_wm || (dev->fw.debug_bin & BIT(1));
-	rx = dev->fw.debug_wm || (dev->fw.debug_bin & BIT(2));
-	en = dev->fw.debug_wm || (dev->fw.debug_bin & BIT(0));
-
-	ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WM, val);
-	if (ret)
-		goto out;
-
-	for (debug = DEBUG_TXCMD; debug <= DEBUG_RPT_RX; debug++) {
-		if (debug == DEBUG_RPT_RX)
-			val = en && rx;
-		else
-			val = en && tx;
-
-		ret = mt7915_mcu_fw_dbg_ctrl(dev, debug, val);
-		if (ret)
-			goto out;
-	}
-#ifdef MTK_DEBUG
-	mt7915_mcu_fw_dbg_ctrl(dev, 68, !!val);
-#endif
-
-	/* WM CPU info record control */
-	mt76_clear(dev, MT_CPU_UTIL_CTRL, BIT(0));
-	mt76_wr(dev, MT_DIC_CMD_REG_CMD, BIT(2) | BIT(13) | !dev->fw.debug_wm);
-	mt76_wr(dev, MT_MCU_WM_CIRQ_IRQ_MASK_CLR_ADDR, BIT(5));
-	mt76_wr(dev, MT_MCU_WM_CIRQ_IRQ_SOFT_ADDR, BIT(5));
-
-#ifdef MTK_DEBUG
-	if (dev->fw.debug_bin & BIT(3))
-		/* use bit 7 to indicate v2 magic number */
-		dev->fw.debug_wm |= BIT(7);
-#endif
-
-out:
-	if (ret)
-		dev->fw.debug_wm = 0;
-
-	return ret;
+	return mt7915_fw_debug_wm_set(dev, val);
 }
 
 static int
@@ -563,27 +512,14 @@ mt7915_fw_debug_wm_get(void *data, u64 *val)
 }
 
 DEFINE_DEBUGFS_ATTRIBUTE(fops_fw_debug_wm, mt7915_fw_debug_wm_get,
-			 mt7915_fw_debug_wm_set, "%lld\n");
+			 _mt7915_fw_debug_wm_set, "%lld\n");
 
 static int
-mt7915_fw_debug_wa_set(void *data, u64 val)
+_mt7915_fw_debug_wa_set(void *data, u64 val)
 {
 	struct mt7915_dev *dev = data;
-	int ret;
 
-	dev->fw.debug_wa = val ? MCU_FW_LOG_TO_HOST : 0;
-
-	ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WA, dev->fw.debug_wa);
-	if (ret)
-		goto out;
-
-	ret = mt7915_mcu_wa_cmd(dev, MCU_WA_PARAM_CMD(SET),
-				MCU_WA_PARAM_PDMA_RX, !!dev->fw.debug_wa, 0);
-out:
-	if (ret)
-		dev->fw.debug_wa = 0;
-
-	return ret;
+	return mt7915_fw_debug_wm_set(dev, val);
 }
 
 static int
@@ -597,7 +533,7 @@ mt7915_fw_debug_wa_get(void *data, u64 *val)
 }
 
 DEFINE_DEBUGFS_ATTRIBUTE(fops_fw_debug_wa, mt7915_fw_debug_wa_get,
-			 mt7915_fw_debug_wa_set, "%lld\n");
+			 _mt7915_fw_debug_wa_set, "%lld\n");
 
 static struct dentry *
 create_buf_file_cb(const char *filename, struct dentry *parent, umode_t mode,

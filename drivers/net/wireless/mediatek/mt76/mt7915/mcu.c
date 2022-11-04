@@ -7,10 +7,15 @@
 #include "mac.h"
 #include "eeprom.h"
 
-static int fw_debug = 0;
-module_param(fw_debug, int, 0644);
-MODULE_PARM_DESC(fw_debug,
-		 "Set to 1 to enable FW debugging on startup.");
+static int fw_debug_wa = 0;
+module_param(fw_debug_wa, int, 0644);
+MODULE_PARM_DESC(fw_debug_wa,
+		 "Set to 1 to enable FW WA debugging on startup.");
+
+static int fw_debug_wm = 0;
+module_param(fw_debug_wm, int, 0644);
+MODULE_PARM_DESC(fw_debug_wm,
+		 "Set to 1 to enable FW WM debugging on startup.");
 
 #define fw_name(_dev, name, ...)	({			\
 	char *_fw;						\
@@ -223,22 +228,27 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 		if (!mdev->first_failed_mcu_cmd)
 			first = "Initial";
 
-		dev_err(mdev->dev, "MCU: %s Failure: Message %08x (cid %lx ext_cid: %lx seq %d) timeout.  Last successful cmd: 0x%x\n",
+		dev_err(mdev->dev, "MCU: %s Failure: Message %08x (cid %lx ext_cid: %lx seq %d) timeout.  Last successful cmd: 0x%x  fail-count: %d\n",
 			first,
 			cmd, FIELD_GET(__MCU_CMD_FIELD_ID, cmd),
 			FIELD_GET(__MCU_CMD_FIELD_EXT_ID, cmd), seq,
-			mdev->last_successful_mcu_cmd);
+			mdev->last_successful_mcu_cmd,
+			dev->ser.cmd_fail_cnt);
 
 		dev->ser.cmd_fail_cnt++;
 
 		if (dev->ser.cmd_fail_cnt < 5) {
 			int exp_type = mt7915_fw_exception_chk(dev);
 
-			dev_err(mdev->dev, "Fw is status(%d) ser.reset_enable: %d\n",
-				exp_type, dev->ser.reset_enable);
-			if (exp_type && dev->ser.reset_enable) {
+			if ((exp_type || dev->ser.cmd_fail_cnt > 1) && dev->ser.reset_enable) {
 				dev->reset_state |= MT_MCU_CMD_WDT_MASK;
+				dev_err(mdev->dev, "Calling reset: Fw excecption check(%d) ser.reset_enable: %d cmd-fail-count: %d\n",
+					exp_type, dev->ser.reset_enable, dev->ser.cmd_fail_cnt);
 				mt7915_reset(dev);
+			}
+			else {
+				dev_info(mdev->dev, "Fw excecption check(%d) ser.reset_enable: %d cmd-fail-count: %d (no-reset)\n",
+					 exp_type, dev->ser.reset_enable, dev->ser.cmd_fail_cnt);
 			}
 		}
 		mt7915_fw_heart_beat_chk(dev);
@@ -2267,6 +2277,82 @@ static int mt7915_load_firmware(struct mt7915_dev *dev)
 	return 0;
 }
 
+int mt7915_fw_debug_wa_set(struct mt7915_dev *dev, u64 val)
+{
+	int ret;
+
+	dev->fw.debug_wa = val ? MCU_FW_LOG_TO_HOST : 0;
+
+	ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WA, dev->fw.debug_wa);
+	if (ret)
+		goto out;
+
+	ret = mt7915_mcu_wa_cmd(dev, MCU_WA_PARAM_CMD(SET),
+				MCU_WA_PARAM_PDMA_RX, !!dev->fw.debug_wa, 0);
+out:
+	if (ret)
+		dev->fw.debug_wa = 0;
+
+	return ret;
+}
+
+int mt7915_fw_debug_wm_set(struct mt7915_dev *dev, u64 val)
+{
+	bool tx, rx, en;
+	int ret;
+	enum mt_debug debug;
+
+	dev->fw.debug_wm = val ? MCU_FW_LOG_TO_HOST : 0;
+#ifdef MTK_DEBUG
+	dev->fw.debug_wm = val;
+#endif
+
+	if (dev->fw.debug_bin)
+		val = 16;
+	else
+		val = dev->fw.debug_wm;
+
+	tx = dev->fw.debug_wm || (dev->fw.debug_bin & BIT(1));
+	rx = dev->fw.debug_wm || (dev->fw.debug_bin & BIT(2));
+	en = dev->fw.debug_wm || (dev->fw.debug_bin & BIT(0));
+
+	ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WM, val);
+	if (ret)
+		goto out;
+
+	for (debug = DEBUG_TXCMD; debug <= DEBUG_RPT_RX; debug++) {
+		if (debug == DEBUG_RPT_RX)
+			val = en && rx;
+		else
+			val = en && tx;
+
+		ret = mt7915_mcu_fw_dbg_ctrl(dev, debug, val);
+		if (ret)
+			goto out;
+	}
+#ifdef MTK_DEBUG
+	mt7915_mcu_fw_dbg_ctrl(dev, 68, !!val);
+#endif
+
+	/* WM CPU info record control */
+	mt76_clear(dev, MT_CPU_UTIL_CTRL, BIT(0));
+	mt76_wr(dev, MT_DIC_CMD_REG_CMD, BIT(2) | BIT(13) | !dev->fw.debug_wm);
+	mt76_wr(dev, MT_MCU_WM_CIRQ_IRQ_MASK_CLR_ADDR, BIT(5));
+	mt76_wr(dev, MT_MCU_WM_CIRQ_IRQ_SOFT_ADDR, BIT(5));
+
+#ifdef MTK_DEBUG
+	if (dev->fw.debug_bin & BIT(3))
+		/* use bit 7 to indicate v2 magic number */
+		dev->fw.debug_wm |= BIT(7);
+#endif
+
+out:
+	if (ret)
+		dev->fw.debug_wm = 0;
+
+	return ret;
+}
+
 int mt7915_mcu_fw_log_2_host(struct mt7915_dev *dev, u8 type, u8 ctrl)
 {
 	struct {
@@ -2471,29 +2557,19 @@ int mt7915_run_firmware(struct mt7915_dev *dev)
 
 	set_bit(MT76_STATE_MCU_RUNNING, &dev->mphy.state);
 
-	if (fw_debug) {
-		enum mt_debug debug;
-
-		/* enable debugging on bootup */
-		dev->fw.debug_wm = 1;
-		dev->fw.debug_wa = 1;
-		ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WM, dev->fw.debug_wm);
-		if (ret)
-			return ret;
-		ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WA, dev->fw.debug_wa);
-		if (ret)
-			return ret;
-		for (debug = DEBUG_TXCMD; debug <= DEBUG_RPT_RX; debug++) {
-			ret = mt7915_mcu_fw_dbg_ctrl(dev, debug, 1);
-			if (ret)
-				return ret;
-		}
-		dev_info(dev->mt76.dev, "mt7915: enabled wm/wa debugging on init\n");
+	if (fw_debug_wm) {
+		ret = mt7915_fw_debug_wm_set(dev, fw_debug_wm);
+		dev_info(dev->mt76.dev, "mt7915: enabled wm debugging on init, ret: %d\n", ret);
 	} else {
 		ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WM, 0);
 		if (ret)
 			return ret;
+	}
 
+	if (fw_debug_wa) {
+		ret = mt7915_fw_debug_wa_set(dev, fw_debug_wa);
+		dev_info(dev->mt76.dev, "mt7915: enabled wa debugging on init, ret: %d\n", ret);
+	} else {
 		ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WA, 0);
 		if (ret)
 			return ret;
@@ -2519,6 +2595,14 @@ int mt7915_run_firmware(struct mt7915_dev *dev)
 				 MCU_WA_PARAM_RED, 0, 0);
 }
 
+static int
+mt7915_get_fail_count(struct mt76_dev *mdev)
+{
+	struct mt7915_dev *dev = container_of(mdev, struct mt7915_dev, mt76);
+
+	return dev->ser.cmd_fail_cnt;
+}
+
 int mt7915_mcu_init(struct mt7915_dev *dev)
 {
 	static const struct mt76_mcu_ops mt7915_mcu_ops = {
@@ -2526,6 +2610,7 @@ int mt7915_mcu_init(struct mt7915_dev *dev)
 		.mcu_skb_send_msg = mt7915_mcu_send_message,
 		.mcu_parse_response = mt7915_mcu_parse_response,
 		.mcu_restart = mt76_connac_mcu_restart,
+		.get_fail_count = mt7915_get_fail_count,
 	};
 
 	dev->mt76.mcu_ops = &mt7915_mcu_ops;
