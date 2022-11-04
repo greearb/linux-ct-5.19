@@ -154,7 +154,7 @@ mt7915_fw_ser_get(struct file *file, char __user *user_buf,
 	char *buff;
 	int desc = 0;
 	ssize_t ret;
-	static const size_t bufsz = 400;
+	static const size_t bufsz = 600;
 
 	buff = kmalloc(bufsz, GFP_KERNEL);
 	if (!buff)
