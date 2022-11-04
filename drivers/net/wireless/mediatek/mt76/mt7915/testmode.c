@@ -347,6 +347,8 @@ mt7915_tm_entry_add(struct mt7915_phy *phy, u8 aid)
 		memcpy(sta->addr, addr, ETH_ALEN);
 	}
 
+	// TODO:  Fix this after merging with newer kernel. --Ben
+#if 0
 	if (td->tx_rate_mode >= MT76_TM_TX_MODE_HT)
 		memcpy(&sta->ht_cap, &sband->ht_cap, sizeof(sta->ht_cap));
 	if (td->tx_rate_mode >= MT76_TM_TX_MODE_VHT)
@@ -354,6 +356,7 @@ mt7915_tm_entry_add(struct mt7915_phy *phy, u8 aid)
 	if (td->tx_rate_mode >= MT76_TM_TX_MODE_HE_SU)
 		memcpy(&sta->he_cap, &sdata[NL80211_IFTYPE_STATION].he_cap,
 		       sizeof(sta->he_cap));
+#endif
 	sta->aid = aid;
 	sta->wme = 1;
 
@@ -1422,6 +1425,7 @@ mt7915_tm_set_tx_frames(struct mt7915_phy *phy, bool en)
 	static const u8 spe_idx_map[] = {0, 0, 1, 0, 3, 2, 4, 0,
 					 9, 8, 6, 10, 16, 12, 18, 0};
 	struct mt76_testmode_data *td = &phy->mt76->test;
+	struct mt7915_dev *dev = phy->dev;
 
 	mt7915_tm_set_trx(phy, TM_MAC_RX_RXV, false);
 	mt7915_tm_set_trx(phy, TM_MAC_TX, false);
@@ -1433,10 +1437,18 @@ mt7915_tm_set_tx_frames(struct mt7915_phy *phy, bool en)
 		if (!phy->test.bf_en)
 			mt7915_tm_update_channel(phy);
 
-		if (td->tx_spe_idx)
+		if (td->tx_spe_idx) {
 			phy->test.spe_idx = td->tx_spe_idx;
-		else
-			phy->test.spe_idx = mt76_connac_spe_idx(td->tx_antenna_mask);
+		}
+		else {
+			u8 tx_ant = td->tx_antenna_mask;
+
+			if (phy != &dev->phy)
+				tx_ant >>= dev->chainshift;
+			phy->test.spe_idx = spe_idx_map[tx_ant];
+		}
+		// TODO:  Fix this once merging with newer kernel. --Ben
+		//phy->test.spe_idx = mt76_connac_spe_idx(td->tx_antenna_mask);
 
 		/* if all three params are set, duty_cycle will be ignored */
 		if (duty_cycle && tx_time && !ipg) {
@@ -1730,7 +1742,7 @@ mt7915_tm_group_prek(struct mt7915_phy *phy, enum mt76_testmode_state state)
 		}
 		dev_info(dev->mt76.dev, "Group Pre-Cal:\n");
 		for (i = 0; i < (group_size / sizeof(u32)); i += 4) {
-			dev_info(dev->mt76.dev, "[0x%08x] 0x%8x 0x%8x 0x%8x 0x%8x\n",
+			dev_info(dev->mt76.dev, "[0x%08lx] 0x%8x 0x%8x 0x%8x 0x%8x\n",
 				 i * sizeof(u32), pre_cal[i], pre_cal[i + 1],
 				 pre_cal[i + 2], pre_cal[i + 3]);
 		}
@@ -1911,7 +1923,7 @@ mt7915_tm_dpd_prek(struct mt7915_phy *phy, enum mt76_testmode_state state)
 		dev_info(dev->mt76.dev, "DPD Pre-Cal:\n");
 		for (i = 0; i < dpd_size / sizeof(u32); i += 4) {
 			j = i + (group_size / sizeof(u32));
-			dev_info(dev->mt76.dev, "[0x%08x] 0x%8x 0x%8x 0x%8x 0x%8x\n",
+			dev_info(dev->mt76.dev, "[0x%08lx] 0x%8x 0x%8x 0x%8x 0x%8x\n",
 				 j * sizeof(u32), pre_cal[j], pre_cal[j + 1],
 				 pre_cal[j + 2], pre_cal[j + 3]);
 		}

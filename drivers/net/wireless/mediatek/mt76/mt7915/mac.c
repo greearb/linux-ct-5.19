@@ -635,7 +635,6 @@ mt7915_mac_write_txwi_tm(struct mt7915_phy *phy, struct mt76_wcid *wcid, __le32 
 {
 	struct mt76_testmode_data *td;
 	struct mt76_testmode_entry_data *ed;
-	struct mt76_wcid *wcid;
 	const struct ieee80211_rate *r;
 	struct mt7915_sta *msta;
 	u8 bw, mode, nss, rate_idx, ldpc;

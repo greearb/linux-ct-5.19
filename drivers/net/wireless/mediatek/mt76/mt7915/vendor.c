@@ -91,10 +91,10 @@ ibf_ctrl_policy[NUM_MTK_VENDOR_ATTRS_IBF_CTRL] = {
 	[MTK_VENDOR_ATTR_IBF_CTRL_ENABLE] = { .type = NLA_U8 },
 };
 
-static struct nla_policy
-ibf_dump_policy[NUM_MTK_VENDOR_ATTRS_IBF_DUMP] = {
-	[MTK_VENDOR_ATTR_IBF_DUMP_ENABLE] = { .type = NLA_U8 },
-};
+//static struct nla_policy
+//ibf_dump_policy[NUM_MTK_VENDOR_ATTRS_IBF_DUMP] = {
+//	[MTK_VENDOR_ATTR_IBF_DUMP_ENABLE] = { .type = NLA_U8 },
+//};
 
 
 struct csi_null_tone {
@@ -1006,8 +1006,8 @@ mt7915_vendor_wireless_ctrl_dump(struct wiphy *wiphy, struct wireless_dev *wdev,
 			     unsigned long *storage)
 {
 	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
-	struct mt7915_phy *phy = mt7915_hw_phy(hw);
-	struct mt7915_dev *dev = phy->dev;
+	//struct mt7915_phy *phy = mt7915_hw_phy(hw); // TODO:  Re-enable this after upstream merge? --Ben
+	//struct mt7915_dev *dev = phy->dev;
 	int len = 0;
 	if (*storage == 1)
 		return -ENOENT;
@@ -1060,7 +1060,7 @@ mt7915_vendor_hemu_ctrl_dump(struct wiphy *wiphy, struct wireless_dev *wdev,
 	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
 	struct mt7915_phy *phy = mt7915_hw_phy(hw);
 	struct mt7915_dev *dev = phy->dev;
-	void *a;
+	//void *a;
 	int len = 0;
 
 	if (*storage == 1)
