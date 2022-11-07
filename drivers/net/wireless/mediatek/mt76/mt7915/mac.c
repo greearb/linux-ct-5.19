@@ -1579,7 +1579,11 @@ mt7915_wait_reset_state(struct mt7915_dev *dev, u32 state)
 				 (READ_ONCE(dev->reset_state) & state),
 				 MT7915_RESET_TIMEOUT);
 
-	WARN(!ret, "Timeout waiting for MCU reset state %x\n", state);
+	if (!ret) {
+		dev_err(dev->mt76.dev, "Timeout waiting for MCU reset state: 0x%x, timeout: %d  dev->reset_state: 0x%x\n",
+			state, MT7915_RESET_TIMEOUT, dev->reset_state);
+		WARN(!ret, "Timeout waiting for MCU reset state %x\n", state);
+	}
 	return ret;
 }
 
