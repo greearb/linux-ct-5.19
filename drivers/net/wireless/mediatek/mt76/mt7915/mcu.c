@@ -2,6 +2,7 @@
 /* Copyright (C) 2020 MediaTek Inc. */
 
 #include <linux/fs.h>
+#include <linux/relay.h>
 #include "mt7915.h"
 #include "mcu.h"
 #include "mac.h"
@@ -2281,6 +2282,9 @@ int mt7915_fw_debug_wa_set(struct mt7915_dev *dev, u64 val)
 {
 	int ret;
 
+	if (val)
+		mt7915_check_add_fwlog(dev);
+
 	dev->fw.debug_wa = val ? MCU_FW_LOG_TO_HOST : 0;
 
 	ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WA, dev->fw.debug_wa);
@@ -2294,6 +2298,44 @@ out:
 		dev->fw.debug_wa = 0;
 
 	return ret;
+}
+
+static int
+remove_buf_file_cb(struct dentry *f)
+{
+	debugfs_remove(f);
+
+	return 0;
+}
+
+static struct dentry *
+create_buf_file_cb(const char *filename, struct dentry *parent, umode_t mode,
+		   struct rchan_buf *buf, int *is_global)
+{
+	struct dentry *f;
+
+	f = debugfs_create_file("fwlog_data", mode, parent, buf,
+				&relay_file_operations);
+	if (IS_ERR(f))
+		return NULL;
+
+	*is_global = 1;
+
+	return f;
+}
+
+bool mt7915_check_add_fwlog(struct mt7915_dev *dev)
+{
+	static struct rchan_callbacks relay_cb = {
+		.create_buf_file = create_buf_file_cb,
+		.remove_buf_file = remove_buf_file_cb,
+	};
+
+	if (!dev->relay_fwlog)
+		dev->relay_fwlog = relay_open("fwlog_data", dev->debugfs_dir,
+					    1500, 512, &relay_cb, NULL);
+
+	return !!dev->relay_fwlog;
 }
 
 int mt7915_fw_debug_wm_set(struct mt7915_dev *dev, u64 val)
@@ -2311,6 +2353,9 @@ int mt7915_fw_debug_wm_set(struct mt7915_dev *dev, u64 val)
 		val = 16;
 	else
 		val = dev->fw.debug_wm;
+
+	if (val)
+		mt7915_check_add_fwlog(dev);
 
 	tx = dev->fw.debug_wm || (dev->fw.debug_bin & BIT(1));
 	rx = dev->fw.debug_wm || (dev->fw.debug_bin & BIT(2));
