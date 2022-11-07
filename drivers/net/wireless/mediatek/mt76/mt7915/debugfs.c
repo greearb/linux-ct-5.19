@@ -1340,7 +1340,7 @@ void mt7915_debugfs_rx_fw_monitor(struct mt7915_dev *dev, const void *data, int 
 	};
 #endif
 	if (dev->fwlog_to_print)
-		wiphy_info(mt76_hw(dev)->wiphy, "%.*s", len, (const char*)data);
+		wiphy_info(mt76_hw(dev)->wiphy, "FWMON: %*ph", len, data);
 
 	if (!dev->relay_fwlog)
 		return;
@@ -1376,7 +1376,8 @@ bool mt7915_debugfs_rx_log(struct mt7915_dev *dev, const void *data, int len)
 		return false;
 
 	if (dev->fwlog_to_print)
-		wiphy_info(mt76_hw(dev)->wiphy, "%.*s", len, (const char*)data);
+		wiphy_info(mt76_hw(dev)->wiphy, "RXLOG: %.*s HEX: %*ph",
+			   len, (const char*)data, len, data);
 
 	if (dev->relay_fwlog)
 		mt7915_debugfs_write_fwlog(dev, NULL, 0, data, len);
