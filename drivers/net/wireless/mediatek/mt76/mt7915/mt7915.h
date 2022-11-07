@@ -456,6 +456,7 @@ struct mt7915_dev {
 	bool bin_file_mode;
 	bool muru_debug;
 	bool ibf;
+	bool fwlog_to_print; /* print firmware messages to dmesg too */
 
 	struct dentry *debugfs_dir;
 	struct rchan *relay_fwlog;

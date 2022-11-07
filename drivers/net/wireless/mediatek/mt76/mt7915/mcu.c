@@ -2286,6 +2286,7 @@ int mt7915_fw_debug_wa_set(struct mt7915_dev *dev, u64 val)
 		mt7915_check_add_fwlog(dev);
 
 	dev->fw.debug_wa = val ? MCU_FW_LOG_TO_HOST : 0;
+	dev->fwlog_to_print = (dev->fw.debug_wa || dev->fw.debug_wm);
 
 	ret = mt7915_mcu_fw_log_2_host(dev, MCU_FW_LOG_WA, dev->fw.debug_wa);
 	if (ret)
@@ -2348,6 +2349,7 @@ int mt7915_fw_debug_wm_set(struct mt7915_dev *dev, u64 val)
 #ifdef MTK_DEBUG
 	dev->fw.debug_wm = val;
 #endif
+	dev->fwlog_to_print = (dev->fw.debug_wa || dev->fw.debug_wm);
 
 	if (dev->fw.debug_bin)
 		val = 16;

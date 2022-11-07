@@ -1339,6 +1339,8 @@ void mt7915_debugfs_rx_fw_monitor(struct mt7915_dev *dev, const void *data, int 
 		.msg_type = PKT_TYPE_RX_FW_MONITOR,
 	};
 #endif
+	if (dev->fwlog_to_print)
+		wiphy_info(mt76_hw(dev)->wiphy, "%.*s", len, (const char*)data);
 
 	if (!dev->relay_fwlog)
 		return;
@@ -1373,10 +1375,11 @@ bool mt7915_debugfs_rx_log(struct mt7915_dev *dev, const void *data, int len)
 #endif
 		return false;
 
+	if (dev->fwlog_to_print)
+		wiphy_info(mt76_hw(dev)->wiphy, "%.*s", len, (const char*)data);
+
 	if (dev->relay_fwlog)
 		mt7915_debugfs_write_fwlog(dev, NULL, 0, data, len);
-	else
-		return false;
 
 	return true;
 }
